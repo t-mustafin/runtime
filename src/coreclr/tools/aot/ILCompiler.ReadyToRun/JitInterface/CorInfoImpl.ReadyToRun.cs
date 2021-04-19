@@ -374,9 +374,9 @@ namespace Internal.JitInterface
             throw new NotSupportedException();
         }
 
-        public static bool ShouldSkipCompilation(MethodDesc methodNeedingCode)
+        public static bool ShouldSkipCompilation(MethodDesc methodNeedingCode, TargetArchitecture architecture = TargetArchitecture.Unknown)
         {
-            if (methodNeedingCode.IsAggressiveOptimization)
+            if (methodNeedingCode.IsAggressiveOptimization && architecture != TargetArchitecture.ARM)
             {
                 return true;
             }
@@ -442,7 +442,7 @@ namespace Internal.JitInterface
 
             try
             {
-                if (!ShouldSkipCompilation(MethodBeingCompiled) && !MethodSignatureIsUnstable(MethodBeingCompiled.Signature, out var _))
+                if (!ShouldSkipCompilation(MethodBeingCompiled, _compilation.NodeFactory.Target.Architecture) && !MethodSignatureIsUnstable(MethodBeingCompiled.Signature, out var _))
                 {
                     MethodIL methodIL = _compilation.GetMethodIL(MethodBeingCompiled);
 
