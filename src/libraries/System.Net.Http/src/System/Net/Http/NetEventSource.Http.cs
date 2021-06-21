@@ -2,18 +2,17 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Tracing;
-using System.Net.Http;
 
 namespace System.Net
 {
-    [EventSource(Name = "Microsoft-System-Net-Http", LocalizationResources = "FxResources.System.Net.Http.SR")]
+    [EventSource(Name = "Private.InternalDiagnostics.System.Net.Http", LocalizationResources = "FxResources.System.Net.Http.SR")]
     internal sealed partial class NetEventSource : EventSource
     {
         private const int UriBaseAddressId = NextAvailableEventId;
         private const int ContentNullId = UriBaseAddressId + 1;
-        private const int ClientSendCompletedId = ContentNullId + 1;
-        private const int HeadersInvalidValueId = ClientSendCompletedId + 1;
+        private const int HeadersInvalidValueId = ContentNullId + 1;
         private const int HandlerMessageId = HeadersInvalidValueId + 1;
         private const int AuthenticationInfoId = HandlerMessageId + 1;
         private const int AuthenticationErrorId = AuthenticationInfoId + 1;
@@ -22,35 +21,24 @@ namespace System.Net
         [NonEvent]
         public static void UriBaseAddress(object obj, Uri? baseAddress)
         {
-            Debug.Assert(IsEnabled);
+            Debug.Assert(Log.IsEnabled());
             Log.UriBaseAddress(baseAddress?.ToString(), IdOf(obj), GetHashCode(obj));
         }
 
         [Event(UriBaseAddressId, Keywords = Keywords.Debug, Level = EventLevel.Informational)]
-        private unsafe void UriBaseAddress(string? uriBaseAddress, string objName, int objHash) =>
+        private void UriBaseAddress(string? uriBaseAddress, string objName, int objHash) =>
             WriteEvent(UriBaseAddressId, uriBaseAddress, objName, objHash);
 
         [NonEvent]
         public static void ContentNull(object obj)
         {
-            Debug.Assert(IsEnabled);
+            Debug.Assert(Log.IsEnabled());
             Log.ContentNull(IdOf(obj), GetHashCode(obj));
         }
 
         [Event(ContentNullId, Keywords = Keywords.Debug, Level = EventLevel.Informational)]
         private void ContentNull(string objName, int objHash) =>
             WriteEvent(ContentNullId, objName, objHash);
-
-        [NonEvent]
-        public static void ClientSendCompleted(HttpClient httpClient, HttpResponseMessage response, HttpRequestMessage request)
-        {
-            Debug.Assert(IsEnabled);
-            Log.ClientSendCompleted(response?.ToString(), GetHashCode(request), GetHashCode(response), GetHashCode(httpClient));
-        }
-
-        [Event(ClientSendCompletedId, Keywords = Keywords.Debug, Level = EventLevel.Verbose)]
-        private void ClientSendCompleted(string? responseString, int httpRequestMessageHash, int httpResponseMessageHash, int httpClientHash) =>
-            WriteEvent(ClientSendCompletedId, responseString, httpRequestMessageHash, httpResponseMessageHash, httpClientHash);
 
         [Event(HeadersInvalidValueId, Keywords = Keywords.Debug, Level = EventLevel.Error)]
         public void HeadersInvalidValue(string name, string rawValue) =>
@@ -67,7 +55,7 @@ namespace System.Net
         [NonEvent]
         public static void AuthenticationInfo(Uri uri, string message)
         {
-            Debug.Assert(IsEnabled);
+            Debug.Assert(Log.IsEnabled());
             Log.AuthenticationInfo(uri?.ToString(), message);
         }
 
@@ -78,7 +66,7 @@ namespace System.Net
         [NonEvent]
         public static void AuthenticationError(Uri? uri, string message)
         {
-            Debug.Assert(IsEnabled);
+            Debug.Assert(Log.IsEnabled());
             Log.AuthenticationError(uri?.ToString(), message);
         }
 
@@ -86,6 +74,10 @@ namespace System.Net
         public void AuthenticationError(string? uri, string message) =>
             WriteEvent(AuthenticationErrorId, uri, message);
 
+#if !ES_BUILD_STANDALONE
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:UnrecognizedReflectionPattern",
+                   Justification = "Parameters to this method are primitive and are trimmer safe")]
+#endif
         [NonEvent]
         private unsafe void WriteEvent(int eventId, int arg1, int arg2, int arg3, string? arg4, string? arg5)
         {

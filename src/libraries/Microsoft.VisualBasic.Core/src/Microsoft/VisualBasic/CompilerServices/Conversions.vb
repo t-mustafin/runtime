@@ -1,6 +1,5 @@
 ' Licensed to the .NET Foundation under one or more agreements.
 ' The .NET Foundation licenses this file to you under the MIT license.
-' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.ComponentModel
@@ -13,11 +12,13 @@ Imports Microsoft.VisualBasic.CompilerServices.Symbols
 Imports Microsoft.VisualBasic.CompilerServices.ConversionResolution
 Imports Microsoft.VisualBasic.CompilerServices.ExceptionUtils
 Imports Microsoft.VisualBasic.CompilerServices.Utils
+Imports System.Diagnostics.CodeAnalysis
 
 Namespace Microsoft.VisualBasic.CompilerServices
 
     <EditorBrowsable(EditorBrowsableState.Never)>
     Public NotInheritable Class Conversions
+        Private Const ConversionsTrimmerMessage As String = "The Expression origin object cannot be statically analyzed and may be trimmed"
 
         Private Sub New()
         End Sub
@@ -1919,8 +1920,6 @@ MisMatch:
                     Throw ex
                 Catch ex As OutOfMemoryException
                     Throw ex
-                Catch ex As Threading.ThreadAbortException
-                    Throw ex
                 Catch Ex As Exception
                     Return False
                 End Try
@@ -2485,11 +2484,20 @@ MisMatch:
 
         End Function
 
-        Public Shared Function ChangeType(ByVal Expression As Object, ByVal TargetType As Type) As Object
+        <RequiresUnreferencedCode(ConversionsTrimmerMessage)>
+        Public Shared Function ChangeType(
+                ByVal Expression As Object,
+                <DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)>
+                ByVal TargetType As Type) As Object
             Return ChangeType(Expression, TargetType, False)
         End Function
 
-        Friend Shared Function ChangeType(ByVal Expression As Object, ByVal TargetType As Type, ByVal Dynamic As Boolean) As Object
+        <RequiresUnreferencedCode("Calls ObjectUserDefinedConversion")>
+        Friend Shared Function ChangeType(
+                ByVal Expression As Object,
+                <DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)>
+                ByVal TargetType As Type,
+                ByVal Dynamic As Boolean) As Object
             If TargetType Is Nothing Then
                 Throw New ArgumentException(SR.Format(SR.Argument_InvalidNullValue1, "TargetType"))
             End If
@@ -2553,16 +2561,22 @@ MisMatch:
         <Obsolete("do not use this method", True)>
         <DebuggerHidden()>
         <DebuggerStepThrough()>
+        <RequiresUnreferencedCode(ConversionsTrimmerMessage)>
         Public Shared Function FallbackUserDefinedConversion(
-                ByVal Expression As Object, ByVal TargetType As Type) As Object
+                ByVal Expression As Object,
+                <DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)>
+                ByVal TargetType As Type) As Object
 
             Return ObjectUserDefinedConversion(Expression, TargetType)
         End Function 'FallbackUserDefinedConversion
 
         <DebuggerHidden()>
         <DebuggerStepThrough()>
+        <RequiresUnreferencedCode("Calls Container.InvokeMethod which is unsafe.")>
         Private Shared Function ObjectUserDefinedConversion(
-                ByVal Expression As Object, ByVal TargetType As Type) As Object
+                ByVal Expression As Object,
+                <DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)>
+                ByVal TargetType As Type) As Object
 
             Dim SourceType As Type = Expression.GetType
             If ClassifyPredefinedConversion(TargetType, SourceType) = ConversionClass.None AndAlso
@@ -2656,6 +2670,7 @@ MisMatch:
 
         ' Simplified version of ObjectUserDefinedConversion, above
         ' Determines if conversion is possible
+        <RequiresUnreferencedCode("Calls ClassifyUserDefinedConversion")>
         Friend Shared Function CanUserDefinedConvert(ByVal Expression As Object, ByVal TargetType As Type) As Boolean
 
             Dim SourceType As Type = Expression.GetType

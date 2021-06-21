@@ -10,18 +10,19 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data.Common
 {
     internal sealed class SqlUdtStorage : DataStorage
     {
-        private object[] _values;
+        private object[] _values = default!; // Late-initialized
         private readonly bool _implementsIXmlSerializable;
         private readonly bool _implementsIComparable;
 
         private static readonly ConcurrentDictionary<Type, object> s_typeToNull = new ConcurrentDictionary<Type, object>();
 
-        public SqlUdtStorage(DataColumn column, Type type)
+        public SqlUdtStorage(DataColumn column, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicFields)] Type type)
         : this(column, type, GetStaticNullForUdtType(type))
         {
         }
@@ -34,22 +35,27 @@ namespace System.Data.Common
         }
 
         // to support oracle types and other INUllable types that have static Null as field
-        internal static object GetStaticNullForUdtType(Type type) => s_typeToNull.GetOrAdd(type, t =>
+        internal static object GetStaticNullForUdtType([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicFields)] Type type) => s_typeToNull.GetOrAdd(type, t => GetStaticNullForUdtTypeCore(type));
+
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2070:UnrecognizedReflectionPattern",
+            Justification = "The only callsite is marked with DynamicallyAccessedMembers. Workaround for https://github.com/mono/linker/issues/1981")]
+        private static object GetStaticNullForUdtTypeCore(Type type)
         {
-            PropertyInfo propInfo = type.GetProperty("Null", BindingFlags.Public | BindingFlags.Static);
+            // TODO: Is it OK for the null value of a UDT to be null? For now annotating is non-nullable.
+            PropertyInfo? propInfo = type.GetProperty("Null", BindingFlags.Public | BindingFlags.Static);
             if (propInfo != null)
             {
-                return propInfo.GetValue(null, null);
+                return propInfo.GetValue(null, null)!;
             }
 
-            FieldInfo fieldInfo = type.GetField("Null", BindingFlags.Public | BindingFlags.Static);
+            FieldInfo fieldInfo = type.GetField("Null", BindingFlags.Public | BindingFlags.Static)!;
             if (fieldInfo != null)
             {
-                return fieldInfo.GetValue(null);
+                return fieldInfo.GetValue(null)!;
             }
 
-            throw ExceptionBuilder.INullableUDTwithoutStaticNull(type.AssemblyQualifiedName);
-        });
+            throw ExceptionBuilder.INullableUDTwithoutStaticNull(type.AssemblyQualifiedName!);
+        }
 
         public override bool IsNull(int record)
         {
@@ -66,7 +72,7 @@ namespace System.Data.Common
             return (CompareValueTo(recordNo1, _values[recordNo2]));
         }
 
-        public override int CompareValueTo(int recordNo1, object value)
+        public override int CompareValueTo(int recordNo1, object? value)
         {
             if (DBNull.Value == value)
             {
@@ -84,7 +90,7 @@ namespace System.Data.Common
                 return nullableValue.IsNull ? 0 : 1; // left may be null, right is null
             }
 
-            throw ExceptionBuilder.IComparableNotImplemented(_dataType.AssemblyQualifiedName);
+            throw ExceptionBuilder.IComparableNotImplemented(_dataType.AssemblyQualifiedName!);
         }
 
         public override void Copy(int recordNo1, int recordNo2)
@@ -142,11 +148,12 @@ namespace System.Data.Common
 
         // Prevent inlining so that reflection calls are not moved to caller that may be in a different assembly that may have a different grant set.
         [MethodImpl(MethodImplOptions.NoInlining)]
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override object ConvertXmlToObject(string s)
         {
             if (_implementsIXmlSerializable)
             {
-                object Obj = System.Activator.CreateInstance(_dataType, true);
+                object Obj = System.Activator.CreateInstance(_dataType, true)!;
 
                 string tempStr = string.Concat("<col>", s, "</col>"); // this is done since you can give fragmet to reader
                 StringReader strReader = new StringReader(tempStr);
@@ -160,26 +167,27 @@ namespace System.Data.Common
 
             StringReader strreader = new StringReader(s);
             XmlSerializer deserializerWithOutRootAttribute = ObjectStorage.GetXmlSerializer(_dataType);
-            return (deserializerWithOutRootAttribute.Deserialize(strreader));
+            return (deserializerWithOutRootAttribute.Deserialize(strreader))!;
         }
 
         // Prevent inlining so that reflection calls are not moved to caller that may be in a different assembly that may have a different grant set.
         [MethodImpl(MethodImplOptions.NoInlining)]
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override object ConvertXmlToObject(XmlReader xmlReader, XmlRootAttribute xmlAttrib)
         {
             if (null == xmlAttrib)
             {
-                string typeName = xmlReader.GetAttribute(Keywords.MSD_INSTANCETYPE, Keywords.MSDNS);
+                string? typeName = xmlReader.GetAttribute(Keywords.MSD_INSTANCETYPE, Keywords.MSDNS);
                 if (typeName == null)
                 {
-                    string xsdTypeName = xmlReader.GetAttribute(Keywords.MSD_INSTANCETYPE, Keywords.XSINS); // this xsd type
+                    string? xsdTypeName = xmlReader.GetAttribute(Keywords.MSD_INSTANCETYPE, Keywords.XSINS); // this xsd type
                     if (null != xsdTypeName)
                     {
-                        typeName = XSDSchema.XsdtoClr(xsdTypeName).FullName;
+                        typeName = XSDSchema.XsdtoClr(xsdTypeName).FullName!;
                     }
                 }
-                Type type = (typeName == null) ? _dataType : Type.GetType(typeName);
-                object Obj = System.Activator.CreateInstance(type, true);
+                Type type = (typeName == null) ? _dataType : Type.GetType(typeName)!;
+                object Obj = System.Activator.CreateInstance(type, true)!;
                 Debug.Assert(xmlReader is DataTextReader, "Invalid DataTextReader is being passed to customer");
                 ((IXmlSerializable)Obj).ReadXml(xmlReader);
                 return Obj;
@@ -187,11 +195,11 @@ namespace System.Data.Common
             else
             {
                 XmlSerializer deserializerWithRootAttribute = ObjectStorage.GetXmlSerializer(_dataType, xmlAttrib);
-                return (deserializerWithRootAttribute.Deserialize(xmlReader));
+                return (deserializerWithRootAttribute.Deserialize(xmlReader))!;
             }
         }
 
-
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override string ConvertObjectToXml(object value)
         {
             StringWriter strwriter = new StringWriter(FormatProvider);
@@ -210,7 +218,8 @@ namespace System.Data.Common
             return (strwriter.ToString());
         }
 
-        public override void ConvertObjectToXml(object value, XmlWriter xmlWriter, XmlRootAttribute xmlAttrib)
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
+        public override void ConvertObjectToXml(object value, XmlWriter xmlWriter, XmlRootAttribute? xmlAttrib)
         {
             if (null == xmlAttrib)
             {

@@ -3,7 +3,6 @@
 
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Threading;
 using Xunit;
 using Xunit.Sdk;
@@ -462,8 +461,13 @@ namespace System.IO.Tests
 
         public static bool CreateSymLink(string targetPath, string linkPath, bool isDirectory)
         {
+            if (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() || OperatingSystem.IsMacCatalyst()) // OSes that don't support Process.Start()
+            {
+                return false;
+            }
+            
             Process symLinkProcess = new Process();
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (OperatingSystem.IsWindows())
             {
                 symLinkProcess.StartInfo.FileName = "cmd";
                 symLinkProcess.StartInfo.Arguments = string.Format("/c mklink{0} \"{1}\" \"{2}\"", isDirectory ? " /D" : "", Path.GetFullPath(linkPath), Path.GetFullPath(targetPath));

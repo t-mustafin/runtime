@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data.Common;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -22,22 +23,26 @@ namespace System.Data
     /// <summary>
     /// Represents an in-memory cache of data.
     /// </summary>
+    [Designer("Microsoft.VSDesigner.Data.VS.DataSetDesigner, Microsoft.VSDesigner, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a")]
     [DefaultProperty(nameof(DataSetName))]
     [Serializable]
+    [ToolboxItem("Microsoft.VSDesigner.Data.VS.DataSetToolboxItem, Microsoft.VSDesigner, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a")]
     [XmlSchemaProvider(nameof(GetDataSetSchema))]
     [XmlRoot(nameof(DataSet))]
     [System.Runtime.CompilerServices.TypeForwardedFrom("System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")]
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor | DynamicallyAccessedMemberTypes.NonPublicConstructors)] // needed by Clone() to preserve derived ctors
     public class DataSet : MarshalByValueComponent, IListSource, IXmlSerializable, ISupportInitializeNotification, ISerializable
     {
+        internal const string RequiresUnreferencedCodeMessage = "Members from serialized types may be trimmed if not referenced directly.";
         private const string KEY_XMLSCHEMA = "XmlSchema";
         private const string KEY_XMLDIFFGRAM = "XmlDiffGram";
 
-        private DataViewManager _defaultViewManager;
+        private DataViewManager? _defaultViewManager;
 
         // Public Collections
         private readonly DataTableCollection _tableCollection;
         private readonly DataRelationCollection _relationCollection;
-        internal PropertyCollection _extendedProperties;
+        internal PropertyCollection? _extendedProperties;
         private string _dataSetName = "NewDataSet";
         private string _datasetPrefix = string.Empty;
         internal string _namespaceURI = string.Empty;
@@ -66,7 +71,7 @@ namespace System.Data
 
         private static int s_objectTypeCount; // Bid counter
         private readonly int _objectID = Interlocked.Increment(ref s_objectTypeCount);
-        private static XmlSchemaComplexType s_schemaTypeForWSDL;
+        private static XmlSchemaComplexType? s_schemaTypeForWSDL;
 
         internal bool _useDataSetSchemaOnly; // UseDataSetSchemaOnly  , for YUKON
         internal bool _udtIsWrapped; // if UDT is wrapped , for YUKON
@@ -142,7 +147,7 @@ namespace System.Data
                 if (e.Name == "DataSet.RemotingFormat")
                 {
                     //DataSet.RemotingFormat does not exist in V1/V1.1 versions
-                    remotingFormat = (SerializationFormat)e.Value;
+                    remotingFormat = (SerializationFormat)e.Value!;
                     break;
                 }
             }
@@ -162,7 +167,7 @@ namespace System.Data
             {
                 if (e.Name == "SchemaSerializationMode.DataSet")
                 { //SchemaSerializationMode.DataSet does not exist in V1/V1.1 versions
-                    schemaSerializationMode = (SchemaSerializationMode)e.Value;
+                    schemaSerializationMode = (SchemaSerializationMode)e.Value!;
                     break;
                 }
             }
@@ -178,7 +183,7 @@ namespace System.Data
             {
                 if (reader.HasAttributes)
                 {
-                    string attribValue = reader.GetAttribute(Keywords.MSD_SCHEMASERIALIZATIONMODE, Keywords.MSDNS);
+                    string? attribValue = reader.GetAttribute(Keywords.MSD_SCHEMASERIALIZATIONMODE, Keywords.MSDNS);
                     if (string.Equals(attribValue, Keywords.MSD_EXCLUDESCHEMA, StringComparison.OrdinalIgnoreCase))
                     {
                         schemaSerializationMode = SchemaSerializationMode.ExcludeSchema;
@@ -200,6 +205,7 @@ namespace System.Data
 
         // Deserialize all the tables data of the dataset from binary/xml stream.
         // 'instance' method that consumes SerializationInfo
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         protected void GetSerializationData(SerializationInfo info, StreamingContext context)
         {
             // mainly for typed DS
@@ -210,7 +216,7 @@ namespace System.Data
             {
                 if (e.Name == "DataSet.RemotingFormat")
                 { //DataSet.RemotingFormat does not exist in V1/V1.1 versions
-                    remotingFormat = (SerializationFormat)e.Value;
+                    remotingFormat = (SerializationFormat)e.Value!;
                     break;
                 }
             }
@@ -220,10 +226,12 @@ namespace System.Data
 
 
         // Deserialize all the tables schema and data of the dataset from binary/xml stream.
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         protected DataSet(SerializationInfo info, StreamingContext context) : this(info, context, true)
         {
         }
 
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         protected DataSet(SerializationInfo info, StreamingContext context, bool ConstructSchema) : this()
         {
             SerializationFormat remotingFormat = SerializationFormat.Xml;
@@ -235,10 +243,10 @@ namespace System.Data
                 switch (e.Name)
                 {
                     case "DataSet.RemotingFormat": //DataSet.RemotingFormat does not exist in V1/V1.1 versions
-                        remotingFormat = (SerializationFormat)e.Value;
+                        remotingFormat = (SerializationFormat)e.Value!;
                         break;
                     case "SchemaSerializationMode.DataSet": //SchemaSerializationMode.DataSet does not exist in V1/V1.1 versions
-                        schemaSerializationMode = (SchemaSerializationMode)e.Value;
+                        schemaSerializationMode = (SchemaSerializationMode)e.Value!;
                         break;
                 }
             }
@@ -270,6 +278,7 @@ namespace System.Data
         protected virtual void InitializeDerivedDataSet() { }
 
         // Serialize all the tables.
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         private void SerializeDataSet(SerializationInfo info, StreamingContext context, SerializationFormat remotingFormat)
         {
             Debug.Assert(info != null);
@@ -303,7 +312,9 @@ namespace System.Data
                     {
                         BinaryFormatter bf = new BinaryFormatter(null, new StreamingContext(context.State, false));
                         MemoryStream memStream = new MemoryStream();
+#pragma warning disable SYSLIB0011 // Issue https://github.com/dotnet/runtime/issues/39289 tracks finding an alternative to BinaryFormatter
                         bf.Serialize(memStream, Tables[i]);
+#pragma warning restore SYSLIB0011
                         memStream.Position = 0;
                         info.AddValue(string.Format(CultureInfo.InvariantCulture, "DataSet.Tables_{0}", i), memStream.GetBuffer());
                     }
@@ -340,7 +351,7 @@ namespace System.Data
                 // old behaviour
                 string strSchema = GetXmlSchemaForRemoting(null);
 
-                string strData = null;
+                string? strData = null;
                 info.AddValue(KEY_XMLSCHEMA, strSchema);
 
                 StringBuilder strBuilder = new StringBuilder(EstimatedXmlStringSize() * 2);
@@ -353,6 +364,7 @@ namespace System.Data
         }
 
         // Deserialize all the tables - marked internal so that DataTable can call into this
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         internal void DeserializeDataSet(SerializationInfo info, StreamingContext context, SerializationFormat remotingFormat, SchemaSerializationMode schemaSerializationMode)
         {
             // deserialize schema
@@ -362,6 +374,7 @@ namespace System.Data
         }
 
         // Deserialize schema.
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         private void DeserializeDataSetSchema(SerializationInfo info, StreamingContext context, SerializationFormat remotingFormat, SchemaSerializationMode schemaSerializationMode)
         {
             if (remotingFormat != SerializationFormat.Xml)
@@ -377,11 +390,13 @@ namespace System.Data
                     //Tables, Columns, Rows
                     for (int i = 0; i < tableCount; i++)
                     {
-                        byte[] buffer = (byte[])info.GetValue(string.Format(CultureInfo.InvariantCulture, "DataSet.Tables_{0}", i), typeof(byte[]));
+                        byte[] buffer = (byte[])info.GetValue(string.Format(CultureInfo.InvariantCulture, "DataSet.Tables_{0}", i), typeof(byte[]))!;
                         MemoryStream memStream = new MemoryStream(buffer);
                         memStream.Position = 0;
                         BinaryFormatter bf = new BinaryFormatter(null, new StreamingContext(context.State, false));
+#pragma warning disable SYSLIB0011 // Issue https://github.com/dotnet/runtime/issues/39289 tracks finding an alternative to BinaryFormatter
                         DataTable dt = (DataTable)bf.Deserialize(memStream);
+#pragma warning restore SYSLIB0011
                         Tables.Add(dt);
                     }
 
@@ -408,7 +423,7 @@ namespace System.Data
             }
             else
             {
-                string strSchema = (string)info.GetValue(KEY_XMLSCHEMA, typeof(string));
+                string? strSchema = (string?)info.GetValue(KEY_XMLSCHEMA, typeof(string));
 
                 if (strSchema != null)
                 {
@@ -418,6 +433,7 @@ namespace System.Data
         }
 
         // Deserialize all  data.
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         private void DeserializeDataSetData(SerializationInfo info, StreamingContext context, SerializationFormat remotingFormat)
         {
             if (remotingFormat != SerializationFormat.Xml)
@@ -429,7 +445,7 @@ namespace System.Data
             }
             else
             {
-                string strData = (string)info.GetValue(KEY_XMLDIFFGRAM, typeof(string));
+                string? strData = (string?)info.GetValue(KEY_XMLDIFFGRAM, typeof(string));
 
                 if (strData != null)
                 {
@@ -459,19 +475,19 @@ namespace System.Data
         private void DeserializeDataSetProperties(SerializationInfo info, StreamingContext context)
         {
             //DataSet basic properties
-            _dataSetName = info.GetString("DataSet.DataSetName");
-            _namespaceURI = info.GetString("DataSet.Namespace");
-            _datasetPrefix = info.GetString("DataSet.Prefix");
+            _dataSetName = info.GetString("DataSet.DataSetName")!;
+            _namespaceURI = info.GetString("DataSet.Namespace")!;
+            _datasetPrefix = info.GetString("DataSet.Prefix")!;
 
             //DataSet runtime properties
             _caseSensitive = info.GetBoolean("DataSet.CaseSensitive");
-            int lcid = (int)info.GetValue("DataSet.LocaleLCID", typeof(int));
+            int lcid = (int)info.GetValue("DataSet.LocaleLCID", typeof(int))!;
             _culture = new CultureInfo(lcid);
             _cultureUserSet = true;
             _enforceConstraints = info.GetBoolean("DataSet.EnforceConstraints");
 
             //ExtendedProperties
-            _extendedProperties = (PropertyCollection)info.GetValue("DataSet.ExtendedProperties", typeof(PropertyCollection));
+            _extendedProperties = (PropertyCollection?)info.GetValue("DataSet.ExtendedProperties", typeof(PropertyCollection));
         }
 
         // Gets relation info from the dataset.
@@ -515,15 +531,15 @@ namespace System.Data
         // Relations -> [relationName]->[parentTableIndex, parentcolumnIndexes]->[childTableIndex, childColumnIndexes]->[Nested]->[extendedProperties]
         private void DeserializeRelations(SerializationInfo info, StreamingContext context)
         {
-            ArrayList relationList = (ArrayList)info.GetValue("DataSet.Relations", typeof(ArrayList));
+            ArrayList relationList = (ArrayList)info.GetValue("DataSet.Relations", typeof(ArrayList))!;
 
             foreach (ArrayList list in relationList)
             {
-                string relationName = (string)list[0];
-                int[] parentInfo = (int[])list[1];
-                int[] childInfo = (int[])list[2];
-                bool isNested = (bool)list[3];
-                PropertyCollection extendedProperties = (PropertyCollection)list[4];
+                string relationName = (string)list[0]!;
+                int[] parentInfo = (int[])list[1]!;
+                int[] childInfo = (int[])list[2]!;
+                bool isNested = (bool)list[3]!;
+                PropertyCollection? extendedProperties = (PropertyCollection?)list[4]!;
 
                 //ParentKey Columns.
                 DataColumn[] parentkeyColumns = new DataColumn[parentInfo.Length - 1];
@@ -586,7 +602,10 @@ namespace System.Data
             }
         }
 
+// TODO: Enable after System.ComponentModel.TypeConverter is annotated
+#nullable disable
         bool IListSource.ContainsListCollection => true;
+#nullable enable
 
         /// <summary>
         /// Gets a custom view of the data contained by the <see cref='System.Data.DataSet'/> , one
@@ -700,7 +719,7 @@ namespace System.Data
                         throw ExceptionBuilder.SetDataSetNameToEmpty();
                     }
 
-                    DataTable conflicting = Tables[value, Namespace];
+                    DataTable? conflicting = Tables[value, Namespace];
                     if ((conflicting != null) && (!conflicting._fNestedInDataset))
                     {
                         throw ExceptionBuilder.SetDataSetNameConflicting(value);
@@ -713,6 +732,7 @@ namespace System.Data
         }
 
         [DefaultValue("")]
+        [AllowNull]
         public string Namespace
         {
             get { return _namespaceURI; }
@@ -756,6 +776,7 @@ namespace System.Data
         }
 
         [DefaultValue("")]
+        [AllowNull]
         public string Prefix
         {
             get { return _datasetPrefix; }
@@ -928,6 +949,8 @@ namespace System.Data
             return _cultureUserSet;
         }
 
+// TODO: Enable after System.ComponentModel.TypeConverter is annotated
+#nullable disable
         [Browsable(false)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public override ISite Site
@@ -954,6 +977,7 @@ namespace System.Data
                 base.Site = value;
             }
         }
+#nullable enable
 
         /// <summary>
         /// Get the collection of relations that link tables and
@@ -1014,17 +1038,17 @@ namespace System.Data
             }
         }
 
-        internal event PropertyChangedEventHandler PropertyChanging;
+        internal event PropertyChangedEventHandler? PropertyChanging;
 
         /// <summary>
         /// Occurs when attempting to merge schemas for two tables with the same name.
         /// </summary>
-        public event MergeFailedEventHandler MergeFailed;
+        public event MergeFailedEventHandler? MergeFailed;
 
-        internal event DataRowCreatedEventHandler DataRowCreated; // Internal for XmlDataDocument only
-        internal event DataSetClearEventhandler ClearFunctionCalled; // Internal for XmlDataDocument only
+        internal event DataRowCreatedEventHandler? DataRowCreated; // Internal for XmlDataDocument only
+        internal event DataSetClearEventhandler? ClearFunctionCalled; // Internal for XmlDataDocument only
 
-        public event EventHandler Initialized;
+        public event EventHandler? Initialized;
 
         public void BeginInit()
         {
@@ -1073,6 +1097,13 @@ namespace System.Data
             }
         }
 
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
+            Justification = "Only parameterless constructors are used here but since nonPublic=true, all non-public constructors are being preserved causing a warning for the serialization constructors. Those constructors won't be used here.")]
+        private DataSet CreateInstanceOfThisType()
+        {
+            return (DataSet)Activator.CreateInstance(GetType(), true)!;
+        }
+
         /// <summary>
         /// Clones the structure of the <see cref='System.Data.DataSet'/>, including all <see cref='System.Data.DataTable'/> schemas, relations, and
         /// constraints.
@@ -1084,7 +1115,7 @@ namespace System.Data
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.Clone|API> {0}", ObjectID);
             try
             {
-                DataSet ds = (DataSet)Activator.CreateInstance(GetType(), true);
+                DataSet ds = CreateInstanceOfThisType();
 
                 if (ds.Tables.Count > 0)  // To clean up all the schema in strong typed dataset.
                 {
@@ -1123,13 +1154,13 @@ namespace System.Data
                             continue;
                         }
 
-                        ForeignKeyConstraint foreign = constraints[j] as ForeignKeyConstraint;
+                        ForeignKeyConstraint foreign = (ForeignKeyConstraint)constraints[j];
                         if (foreign.Table == foreign.RelatedTable)
                         {
                             continue; // we have already added this foreign key in while cloning the datatable
                         }
 
-                        ds.Tables[i].Constraints.Add(constraints[j].Clone(ds));
+                        ds.Tables[i].Constraints.Add(constraints[j].Clone(ds)!);
                     }
                 }
 
@@ -1158,7 +1189,7 @@ namespace System.Data
                     {
                         if (col.Expression.Length != 0)
                         {
-                            ds.Tables[table.TableName, table.Namespace].Columns[col.ColumnName].Expression = col.Expression;
+                            ds.Tables[table.TableName, table.Namespace]!.Columns[col.ColumnName]!.CopyExpressionFrom(col);
                         }
                     }
                 }
@@ -1191,7 +1222,7 @@ namespace System.Data
                 dsNew.EnforceConstraints = false;
                 foreach (DataTable table in Tables)
                 {
-                    DataTable destTable = dsNew.Tables[table.TableName, table.Namespace];
+                    DataTable destTable = dsNew.Tables[table.TableName, table.Namespace]!;
 
                     foreach (DataRow row in table.Rows)
                     {
@@ -1231,7 +1262,7 @@ namespace System.Data
         /// Returns a copy of the <see cref='System.Data.DataSet'/> that contains all changes made to
         /// it since it was loaded or <see cref='System.Data.DataSet.AcceptChanges'/> was last called.
         /// </summary>
-        public DataSet GetChanges() =>
+        public DataSet? GetChanges() =>
             GetChanges(DataRowState.Added | DataRowState.Deleted | DataRowState.Modified);
 
         private struct TableChanges
@@ -1258,12 +1289,12 @@ namespace System.Data
             }
         }
 
-        public DataSet GetChanges(DataRowState rowStates)
+        public DataSet? GetChanges(DataRowState rowStates)
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.GetChanges|API> {0}, rowStates={1}", ObjectID, rowStates);
             try
             {
-                DataSet dsNew = null;
+                DataSet? dsNew = null;
                 bool fEnforceConstraints = false;
                 if (0 != (rowStates & ~(DataRowState.Added | DataRowState.Deleted | DataRowState.Modified | DataRowState.Unchanged)))
                 {
@@ -1294,7 +1325,7 @@ namespace System.Data
                         }
 
                         DataTable table = Tables[i];
-                        DataTable destTable = dsNew.Tables[table.TableName, table.Namespace];
+                        DataTable destTable = dsNew.Tables[table.TableName, table.Namespace]!;
                         Debug.Assert(bitMatrix[i].HasChanges <= table.Rows.Count, "to many changes");
 
                         for (int j = 0; 0 < bitMatrix[i].HasChanges; ++j)
@@ -1380,22 +1411,24 @@ namespace System.Data
             }
         }
 
+        // TODO: Enable after System.ComponentModel.TypeConverter is annotated
+#nullable disable
         IList IListSource.GetList() => DefaultViewManager;
+#nullable enable
 
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         internal string GetRemotingDiffGram(DataTable table)
         {
             StringWriter strWriter = new StringWriter(CultureInfo.InvariantCulture);
             XmlTextWriter writer = new XmlTextWriter(strWriter);
             writer.Formatting = Formatting.Indented;
-            if (strWriter != null)
-            {
-                // Create and save the updates
-                new NewDiffgramGen(table, false).Save(writer, table);
-            }
+            // Create and save the updates
+            new NewDiffgramGen(table, false).Save(writer, table);
 
             return strWriter.ToString();
         }
 
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         public string GetXml()
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.GetXml|API> {0}", ObjectID);
@@ -1404,12 +1437,9 @@ namespace System.Data
                 // StringBuilder strBuilder = new StringBuilder(EstimatedXmlStringSize());
                 // StringWriter strWriter = new StringWriter(strBuilder);
                 StringWriter strWriter = new StringWriter(CultureInfo.InvariantCulture);
-                if (strWriter != null)
-                {
-                    XmlTextWriter w = new XmlTextWriter(strWriter);
-                    w.Formatting = Formatting.Indented;
-                    new XmlDataTreeWriter(this).Save(w, false);
-                }
+                XmlTextWriter w = new XmlTextWriter(strWriter);
+                w.Formatting = Formatting.Indented;
+                new XmlDataTreeWriter(this).Save(w, false);
                 return strWriter.ToString();
             }
             finally
@@ -1418,6 +1448,7 @@ namespace System.Data
             }
         }
 
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         public string GetXmlSchema()
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.GetXmlSchema|API> {0}", ObjectID);
@@ -1426,10 +1457,7 @@ namespace System.Data
                 StringWriter strWriter = new StringWriter(CultureInfo.InvariantCulture);
                 XmlTextWriter writer = new XmlTextWriter(strWriter);
                 writer.Formatting = Formatting.Indented;
-                if (strWriter != null)
-                {
-                    (new XmlTreeGen(SchemaFormat.Public)).Save(this, writer);
-                }
+                (new XmlTreeGen(SchemaFormat.Public)).Save(this, writer);
 
                 return strWriter.ToString();
             }
@@ -1439,29 +1467,27 @@ namespace System.Data
             }
         }
 
-        internal string GetXmlSchemaForRemoting(DataTable table)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        internal string GetXmlSchemaForRemoting(DataTable? table)
         {
             StringWriter strWriter = new StringWriter(CultureInfo.InvariantCulture);
             XmlTextWriter writer = new XmlTextWriter(strWriter);
             writer.Formatting = Formatting.Indented;
-            if (strWriter != null)
+            if (table == null)
             {
-                if (table == null)
+                if (SchemaSerializationMode == SchemaSerializationMode.ExcludeSchema)
                 {
-                    if (SchemaSerializationMode == SchemaSerializationMode.ExcludeSchema)
-                    {
-                        (new XmlTreeGen(SchemaFormat.RemotingSkipSchema)).Save(this, writer);
-                    }
-                    else
-                    {
-                        (new XmlTreeGen(SchemaFormat.Remoting)).Save(this, writer);
-                    }
+                    (new XmlTreeGen(SchemaFormat.RemotingSkipSchema)).Save(this, writer);
                 }
                 else
                 {
-                    // no skip schema support for typed datatable
-                    (new XmlTreeGen(SchemaFormat.Remoting)).Save(table, writer);
+                    (new XmlTreeGen(SchemaFormat.Remoting)).Save(this, writer);
                 }
+            }
+            else
+            {
+                // no skip schema support for typed datatable
+                (new XmlTreeGen(SchemaFormat.Remoting)).Save(table, writer);
             }
 
             return strWriter.ToString();
@@ -1514,7 +1540,8 @@ namespace System.Data
         /// <summary>
         /// Infer the XML schema from the specified <see cref='System.IO.TextReader'/> into the <see cref='System.Data.DataSet'/>.
         /// </summary>
-        public void InferXmlSchema(XmlReader reader, string[] nsArray)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void InferXmlSchema(XmlReader? reader, string[]? nsArray)
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.InferXmlSchema|API> {0}", ObjectID);
             try
@@ -1527,7 +1554,7 @@ namespace System.Data
                 XmlDocument xdoc = new XmlDocument();
                 if (reader.NodeType == XmlNodeType.Element)
                 {
-                    XmlNode node = xdoc.ReadNode(reader);
+                    XmlNode node = xdoc.ReadNode(reader)!;
                     xdoc.AppendChild(node);
                 }
                 else
@@ -1551,7 +1578,8 @@ namespace System.Data
         /// <summary>
         /// Infer the XML schema from the specified <see cref='System.IO.TextReader'/> into the <see cref='System.Data.DataSet'/>.
         /// </summary>
-        public void InferXmlSchema(Stream stream, string[] nsArray)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void InferXmlSchema(Stream? stream, string[]? nsArray)
         {
             if (stream == null)
             {
@@ -1564,7 +1592,8 @@ namespace System.Data
         /// <summary>
         /// Infer the XML schema from the specified <see cref='System.IO.TextReader'/> into the <see cref='System.Data.DataSet'/>.
         /// </summary>
-        public void InferXmlSchema(TextReader reader, string[] nsArray)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void InferXmlSchema(TextReader? reader, string[]? nsArray)
         {
             if (reader == null)
             {
@@ -1577,7 +1606,8 @@ namespace System.Data
         /// <summary>
         /// Infer the XML schema from the specified file into the <see cref='System.Data.DataSet'/>.
         /// </summary>
-        public void InferXmlSchema(string fileName, string[] nsArray)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void InferXmlSchema(string fileName, string[]? nsArray)
         {
             XmlTextReader xr = new XmlTextReader(fileName);
             try
@@ -1593,9 +1623,11 @@ namespace System.Data
         /// <summary>
         /// Reads the XML schema from the specified <see cref="System.Xml.XmlReader" /> into the <see cref="System.Data.DataSet" />
         /// </summary>
-        public void ReadXmlSchema(XmlReader reader) => ReadXmlSchema(reader, false);
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void ReadXmlSchema(XmlReader? reader) => ReadXmlSchema(reader, false);
 
-        internal void ReadXmlSchema(XmlReader reader, bool denyResolving)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        internal void ReadXmlSchema(XmlReader? reader, bool denyResolving)
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.ReadXmlSchema|INFO> {0}, reader, denyResolving={1}", ObjectID, denyResolving);
             try
@@ -1687,7 +1719,7 @@ namespace System.Data
                             throw ExceptionBuilder.DataSetUnsupportedSchema(Keywords.XSDNS);
                         }
 
-                        XmlNode node = xdoc.ReadNode(reader);
+                        XmlNode node = xdoc.ReadNode(reader)!;
                         topNode.AppendChild(node);
                     }
 
@@ -1739,6 +1771,7 @@ namespace System.Data
             }
         }
 
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         internal void ReadXSDSchema(XmlReader reader, bool denyResolving)
         {
             XmlSchemaSet sSet = new XmlSchemaSet();
@@ -1749,7 +1782,7 @@ namespace System.Data
             {
                 if (reader.HasAttributes)
                 {
-                    string attribValue = reader.GetAttribute(Keywords.MSD_FRAGMENTCOUNT, Keywords.MSDNS); // this must not move the position
+                    string? attribValue = reader.GetAttribute(Keywords.MSD_FRAGMENTCOUNT, Keywords.MSDNS); // this must not move the position
                     if (!string.IsNullOrEmpty(attribValue))
                     {
                         schemaFragmentCount = int.Parse(attribValue, null);
@@ -1759,7 +1792,7 @@ namespace System.Data
 
             while (reader.LocalName == Keywords.XSD_SCHEMA && reader.NamespaceURI == Keywords.XSDNS)
             {
-                XmlSchema s = XmlSchema.Read(reader, null);
+                XmlSchema s = XmlSchema.Read(reader, null)!;
                 sSet.Add(s);
                 //read the end tag
                 ReadEndElement(reader);
@@ -1778,13 +1811,14 @@ namespace System.Data
             schema.LoadSchema(sSet, this);
         }
 
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         internal void ReadXDRSchema(XmlReader reader)
         {
             XmlDocument xdoc = new XmlDocument(); // we may need this to infer the schema
-            XmlNode schNode = xdoc.ReadNode(reader);
+            XmlNode schNode = xdoc.ReadNode(reader)!;
             xdoc.AppendChild(schNode);
             XDRSchema schema = new XDRSchema(this, false);
-            DataSetName = xdoc.DocumentElement.LocalName;
+            DataSetName = xdoc.DocumentElement!.LocalName;
             schema.LoadSchema((XmlElement)schNode, this);
         }
 
@@ -1792,7 +1826,8 @@ namespace System.Data
         /// Reads the XML schema from the specified <see cref='System.IO.Stream'/> into the
         /// <see cref='System.Data.DataSet'/>.
         /// </summary>
-        public void ReadXmlSchema(Stream stream)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void ReadXmlSchema(Stream? stream)
         {
             if (stream == null)
             {
@@ -1805,7 +1840,8 @@ namespace System.Data
         /// <summary>
         /// Reads the XML schema from the specified <see cref='System.IO.TextReader'/> into the <see cref='System.Data.DataSet'/>.
         /// </summary>
-        public void ReadXmlSchema(TextReader reader)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void ReadXmlSchema(TextReader? reader)
         {
             if (reader == null)
             {
@@ -1818,6 +1854,7 @@ namespace System.Data
         /// <summary>
         /// Reads the XML schema from the specified file into the <see cref='System.Data.DataSet'/>.
         /// </summary>
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         public void ReadXmlSchema(string fileName)
         {
             XmlTextReader xr = new XmlTextReader(fileName);
@@ -1834,12 +1871,14 @@ namespace System.Data
         #region WriteXmlSchema
         /// <summary>Writes the <see cref='DataSet'/> structure as an XML schema to using the specified <see cref='Stream'/> object.</summary>
         /// <param name="stream">A <see cref='Stream'/> object used to write to a file.</param>
-        public void WriteXmlSchema(Stream stream) => WriteXmlSchema(stream, SchemaFormat.Public, null);
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void WriteXmlSchema(Stream? stream) => WriteXmlSchema(stream, SchemaFormat.Public, null);
 
         /// <summary>Writes the <see cref='DataSet'/> structure as an XML schema to using the specified <see cref='Stream'/> object.</summary>
         /// <param name="stream">A <see cref='Stream'/> object used to write to a file.</param>
         /// <param name="multipleTargetConverter">A delegate used to convert <see cref='Type'/> into string.</param>
-        public void WriteXmlSchema(Stream stream, Converter<Type, string> multipleTargetConverter)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void WriteXmlSchema(Stream? stream, Converter<Type, string> multipleTargetConverter)
         {
             ADP.CheckArgumentNull(multipleTargetConverter, nameof(multipleTargetConverter));
             WriteXmlSchema(stream, SchemaFormat.Public, multipleTargetConverter);
@@ -1847,11 +1886,13 @@ namespace System.Data
 
         /// <summary>Writes the <see cref='DataSet'/> structure as an XML schema to a file.</summary>
         /// <param name="fileName">The file name (including the path) to which to write.</param>
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         public void WriteXmlSchema(string fileName) => WriteXmlSchema(fileName, SchemaFormat.Public, null);
 
         /// <summary>Writes the <see cref='DataSet'/> structure as an XML schema to a file.</summary>
         /// <param name="fileName">The file name (including the path) to which to write.</param>
         /// <param name="multipleTargetConverter">A delegate used to convert <see cref='Type'/> into string.</param>
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         public void WriteXmlSchema(string fileName, Converter<Type, string> multipleTargetConverter)
         {
             ADP.CheckArgumentNull(multipleTargetConverter, nameof(multipleTargetConverter));
@@ -1860,12 +1901,14 @@ namespace System.Data
 
         /// <summary>Writes the <see cref='DataSet'/> structure as an XML schema to a <see cref='TextWriter'/> object.</summary>
         /// <param name="writer">The <see cref='TextWriter'/> object with which to write.</param>
-        public void WriteXmlSchema(TextWriter writer) => WriteXmlSchema(writer, SchemaFormat.Public, null);
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void WriteXmlSchema(TextWriter? writer) => WriteXmlSchema(writer, SchemaFormat.Public, null);
 
         /// <summary>Writes the <see cref='DataSet'/> structure as an XML schema to a <see cref='TextWriter'/> object.</summary>
         /// <param name="writer">The <see cref='TextWriter'/> object with which to write.</param>
         /// <param name="multipleTargetConverter">A delegate used to convert <see cref='Type'/> into string.</param>
-        public void WriteXmlSchema(TextWriter writer, Converter<Type, string> multipleTargetConverter)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void WriteXmlSchema(TextWriter? writer, Converter<Type, string> multipleTargetConverter)
         {
             ADP.CheckArgumentNull(multipleTargetConverter, nameof(multipleTargetConverter));
             WriteXmlSchema(writer, SchemaFormat.Public, multipleTargetConverter);
@@ -1873,18 +1916,21 @@ namespace System.Data
 
         /// <summary>Writes the <see cref='DataSet'/> structure as an XML schema to an <see cref='XmlWriter'/> object.</summary>
         /// <param name="writer">The <see cref='XmlWriter'/> object with which to write.</param>
-        public void WriteXmlSchema(XmlWriter writer) => WriteXmlSchema(writer, SchemaFormat.Public, null);
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void WriteXmlSchema(XmlWriter? writer) => WriteXmlSchema(writer, SchemaFormat.Public, null);
 
         /// <summary>Writes the <see cref='DataSet'/> structure as an XML schema to an <see cref='XmlWriter'/> object.</summary>
         /// <param name="writer">The <see cref='XmlWriter'/> object with which to write.</param>
         /// <param name="multipleTargetConverter">A delegate used to convert <see cref='Type'/> into string.</param>
-        public void WriteXmlSchema(XmlWriter writer, Converter<Type, string> multipleTargetConverter)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void WriteXmlSchema(XmlWriter? writer, Converter<Type, string> multipleTargetConverter)
         {
             ADP.CheckArgumentNull(multipleTargetConverter, nameof(multipleTargetConverter));
             WriteXmlSchema(writer, SchemaFormat.Public, multipleTargetConverter);
         }
 
-        private void WriteXmlSchema(string fileName, SchemaFormat schemaFormat, Converter<Type, string> multipleTargetConverter)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        private void WriteXmlSchema(string fileName, SchemaFormat schemaFormat, Converter<Type, string>? multipleTargetConverter)
         {
             XmlTextWriter xw = new XmlTextWriter(fileName, null);
             try
@@ -1900,7 +1946,8 @@ namespace System.Data
             }
         }
 
-        private void WriteXmlSchema(Stream stream, SchemaFormat schemaFormat, Converter<Type, string> multipleTargetConverter)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        private void WriteXmlSchema(Stream? stream, SchemaFormat schemaFormat, Converter<Type, string>? multipleTargetConverter)
         {
             if (stream == null)
             {
@@ -1913,7 +1960,8 @@ namespace System.Data
             WriteXmlSchema(w, schemaFormat, multipleTargetConverter);
         }
 
-        private void WriteXmlSchema(TextWriter writer, SchemaFormat schemaFormat, Converter<Type, string> multipleTargetConverter)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        private void WriteXmlSchema(TextWriter? writer, SchemaFormat schemaFormat, Converter<Type, string>? multipleTargetConverter)
         {
             if (writer == null)
             {
@@ -1926,7 +1974,8 @@ namespace System.Data
             WriteXmlSchema(w, schemaFormat, multipleTargetConverter);
         }
 
-        private void WriteXmlSchema(XmlWriter writer, SchemaFormat schemaFormat, Converter<Type, string> multipleTargetConverter)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        private void WriteXmlSchema(XmlWriter? writer, SchemaFormat schemaFormat, Converter<Type, string>? multipleTargetConverter)
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.WriteXmlSchema|INFO> {0}, schemaFormat={1}", ObjectID, schemaFormat);
             try
@@ -1934,7 +1983,7 @@ namespace System.Data
                 // Generate SchemaTree and write it out
                 if (writer != null)
                 {
-                    XmlTreeGen treeGen = null;
+                    XmlTreeGen? treeGen = null;
                     if (schemaFormat == SchemaFormat.WebService &&
                         SchemaSerializationMode == SchemaSerializationMode.ExcludeSchema &&
                         writer.WriteState == WriteState.Element)
@@ -1956,13 +2005,17 @@ namespace System.Data
         }
         #endregion
 
-        public XmlReadMode ReadXml(XmlReader reader) => ReadXml(reader, false);
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public XmlReadMode ReadXml(XmlReader? reader) => ReadXml(reader, false);
 
-        internal XmlReadMode ReadXml(XmlReader reader, bool denyResolving)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        internal XmlReadMode ReadXml(XmlReader? reader, bool denyResolving)
         {
+            IDisposable? restrictedScope = null;
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.ReadXml|INFO> {0}, denyResolving={1}", ObjectID, denyResolving);
             try
             {
+                restrictedScope = TypeLimiter.EnterRestrictedScope(this);
                 DataTable.DSRowDiffIdUsageSection rowDiffIdUsage = default;
                 try
                 {
@@ -1995,7 +2048,7 @@ namespace System.Data
                     }
 
                     XmlDocument xdoc = new XmlDocument(); // we may need this to infer the schema
-                    XmlDataLoader xmlload = null;
+                    XmlDataLoader? xmlload = null;
 
                     reader.MoveToContent();
 
@@ -2113,7 +2166,7 @@ namespace System.Data
 
                                 if (!fSchemaFound && Tables.Count == 0)
                                 {
-                                    XmlNode node = xdoc.ReadNode(reader);
+                                    XmlNode node = xdoc.ReadNode(reader)!;
                                     topNode.AppendChild(node);
                                 }
                                 else
@@ -2169,12 +2222,12 @@ namespace System.Data
 
                         if (!isEmptyDataSet && !topNodeIsProcessed)
                         {
-                            XmlElement root = xdoc.DocumentElement;
+                            XmlElement root = xdoc.DocumentElement!;
                             Debug.Assert(root.NamespaceURI != null, "root.NamespaceURI should not ne null, it should be empty string");
                             // just recognize that below given Xml represents datatable in toplevel
                             //<table attr1="foo" attr2="bar" table_Text="junk">text</table>
                             // only allow root element with simple content, if any
-                            if (root.ChildNodes.Count == 0 || ((root.ChildNodes.Count == 1) && root.FirstChild.GetType() == typeof(System.Xml.XmlText)))
+                            if (root.ChildNodes.Count == 0 || ((root.ChildNodes.Count == 1) && root.FirstChild!.GetType() == typeof(System.Xml.XmlText)))
                             {
                                 bool initfTopLevelTable = _fTopLevelTable;
                                 // if root element maps to a datatable
@@ -2230,11 +2283,13 @@ namespace System.Data
             }
             finally
             {
+                restrictedScope?.Dispose();
                 DataCommonEventSource.Log.ExitScope(logScopeId);
             }
         }
 
-        public XmlReadMode ReadXml(Stream stream)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public XmlReadMode ReadXml(Stream? stream)
         {
             if (stream == null)
             {
@@ -2249,7 +2304,8 @@ namespace System.Data
             return ReadXml(xr, false);
         }
 
-        public XmlReadMode ReadXml(TextReader reader)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public XmlReadMode ReadXml(TextReader? reader)
         {
             if (reader == null)
             {
@@ -2264,6 +2320,7 @@ namespace System.Data
             return ReadXml(xr, false);
         }
 
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         public XmlReadMode ReadXml(string fileName)
         {
             XmlTextReader xr = new XmlTextReader(fileName);
@@ -2281,7 +2338,8 @@ namespace System.Data
             }
         }
 
-        internal void InferSchema(XmlDocument xdoc, string[] excludedNamespaces, XmlReadMode mode)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        internal void InferSchema(XmlDocument xdoc, string[]? excludedNamespaces, XmlReadMode mode)
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.InferSchema|INFO> {0}, mode={1}", ObjectID, mode);
             try
@@ -2332,6 +2390,7 @@ namespace System.Data
             return true;
         }
 
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         private void ReadXmlDiffgram(XmlReader reader)
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.ReadXmlDiffgram|INFO> {0}", ObjectID);
@@ -2462,13 +2521,17 @@ namespace System.Data
 
         /// <summary>
         /// </summary>
-        public XmlReadMode ReadXml(XmlReader reader, XmlReadMode mode) => ReadXml(reader, mode, false);
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public XmlReadMode ReadXml(XmlReader? reader, XmlReadMode mode) => ReadXml(reader, mode, false);
 
-        internal XmlReadMode ReadXml(XmlReader reader, XmlReadMode mode, bool denyResolving)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        internal XmlReadMode ReadXml(XmlReader? reader, XmlReadMode mode, bool denyResolving)
         {
+            IDisposable? restictedScope = null;
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.ReadXml|INFO> {0}, mode={1}, denyResolving={2}", ObjectID, mode, denyResolving);
             try
             {
+                restictedScope = TypeLimiter.EnterRestrictedScope(this);
                 XmlReadMode ret = mode;
 
                 if (reader == null)
@@ -2506,15 +2569,15 @@ namespace System.Data
                     }
 
                     reader.MoveToContent();
-                    XmlDataLoader xmlload = null;
+                    XmlDataLoader? xmlload = null;
 
                     if (reader.NodeType == XmlNodeType.Element)
                     {
-                        XmlElement topNode = null;
+                        XmlElement? topNode = null;
                         if (mode == XmlReadMode.Fragment)
                         {
                             xdoc.AppendChild(xdoc.CreateElement("ds_sqlXmlWraPPeR"));
-                            topNode = xdoc.DocumentElement;
+                            topNode = xdoc.DocumentElement!;
                         }
                         else
                         {
@@ -2655,7 +2718,7 @@ namespace System.Data
 
                             if (mode == XmlReadMode.InferSchema || mode == XmlReadMode.InferTypedSchema)
                             { //save the node in DOM until the end;
-                                XmlNode node = xdoc.ReadNode(reader);
+                                XmlNode node = xdoc.ReadNode(reader)!;
                                 topNode.AppendChild(node);
                             }
                             else
@@ -2710,11 +2773,13 @@ namespace System.Data
             }
             finally
             {
+                restictedScope?.Dispose();
                 DataCommonEventSource.Log.ExitScope(logScopeId);
             }
         }
 
-        public XmlReadMode ReadXml(Stream stream, XmlReadMode mode)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public XmlReadMode ReadXml(Stream? stream, XmlReadMode mode)
         {
             if (stream == null)
             {
@@ -2727,7 +2792,8 @@ namespace System.Data
             return ReadXml(reader, mode, false);
         }
 
-        public XmlReadMode ReadXml(TextReader reader, XmlReadMode mode)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public XmlReadMode ReadXml(TextReader? reader, XmlReadMode mode)
         {
             if (reader == null)
             {
@@ -2740,9 +2806,10 @@ namespace System.Data
             return ReadXml(xmlreader, mode, false);
         }
 
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         public XmlReadMode ReadXml(string fileName, XmlReadMode mode)
         {
-            XmlTextReader xr = null;
+            XmlTextReader? xr = null;
             if (mode == XmlReadMode.Fragment)
             {
                 FileStream stream = new FileStream(fileName, FileMode.Open);
@@ -2766,18 +2833,23 @@ namespace System.Data
             }
         }
 
-        public void WriteXml(Stream stream) => WriteXml(stream, XmlWriteMode.IgnoreSchema);
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void WriteXml(Stream? stream) => WriteXml(stream, XmlWriteMode.IgnoreSchema);
 
-        public void WriteXml(TextWriter writer) => WriteXml(writer, XmlWriteMode.IgnoreSchema);
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void WriteXml(TextWriter? writer) => WriteXml(writer, XmlWriteMode.IgnoreSchema);
 
-        public void WriteXml(XmlWriter writer) => WriteXml(writer, XmlWriteMode.IgnoreSchema);
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void WriteXml(XmlWriter? writer) => WriteXml(writer, XmlWriteMode.IgnoreSchema);
 
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         public void WriteXml(string fileName) => WriteXml(fileName, XmlWriteMode.IgnoreSchema);
 
         /// <summary>
         /// Writes schema and data for the DataSet.
         /// </summary>
-        public void WriteXml(Stream stream, XmlWriteMode mode)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void WriteXml(Stream? stream, XmlWriteMode mode)
         {
             if (stream != null)
             {
@@ -2788,7 +2860,8 @@ namespace System.Data
             }
         }
 
-        public void WriteXml(TextWriter writer, XmlWriteMode mode)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void WriteXml(TextWriter? writer, XmlWriteMode mode)
         {
             if (writer != null)
             {
@@ -2799,7 +2872,8 @@ namespace System.Data
             }
         }
 
-        public void WriteXml(XmlWriter writer, XmlWriteMode mode)
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
+        public void WriteXml(XmlWriter? writer, XmlWriteMode mode)
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.WriteXml|API> {0}, mode={1}", ObjectID, mode);
             try
@@ -2825,6 +2899,7 @@ namespace System.Data
             }
         }
 
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         public void WriteXml(string fileName, XmlWriteMode mode)
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.WriteXml|API> {0}, fileName='{1}', mode={2}", ObjectID, fileName, (int)mode);
@@ -2833,18 +2908,15 @@ namespace System.Data
             {
                 xw.Formatting = Formatting.Indented;
                 xw.WriteStartDocument(true);
-                if (xw != null)
+                // Create and save the updates
+                if (mode == XmlWriteMode.DiffGram)
                 {
-                    // Create and save the updates
-                    if (mode == XmlWriteMode.DiffGram)
-                    {
-                        new NewDiffgramGen(this).Save(xw);
-                    }
-                    else
-                    {
-                        // Create and save xml data
-                        new XmlDataTreeWriter(this).Save(xw, mode == XmlWriteMode.WriteSchema);
-                    }
+                    new NewDiffgramGen(this).Save(xw);
+                }
+                else
+                {
+                    // Create and save xml data
+                    new XmlDataTreeWriter(this).Save(xw, mode == XmlWriteMode.WriteSchema);
                 }
                 xw.WriteEndDocument();
             }
@@ -2867,6 +2939,7 @@ namespace System.Data
         public void Merge(DataSet dataSet)
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.Merge|API> {0}, dataSet={1}", ObjectID, (dataSet != null) ? dataSet.ObjectID : 0);
+            Debug.Assert(dataSet != null);
             try
             {
                 Merge(dataSet, false, MissingSchemaAction.Add);
@@ -2884,6 +2957,7 @@ namespace System.Data
         public void Merge(DataSet dataSet, bool preserveChanges)
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.Merge|API> {0}, dataSet={1}, preserveChanges={2}", ObjectID, (dataSet != null) ? dataSet.ObjectID : 0, preserveChanges);
+            Debug.Assert(dataSet != null);
             try
             {
                 Merge(dataSet, preserveChanges, MissingSchemaAction.Add);
@@ -2935,6 +3009,7 @@ namespace System.Data
         public void Merge(DataTable table)
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.Merge|API> {0}, table={1}", ObjectID, (table != null) ? table.ObjectID : 0);
+            Debug.Assert(table != null);
             try
             {
                 Merge(table, false, MissingSchemaAction.Add);
@@ -3044,7 +3119,7 @@ namespace System.Data
             }
         }
 
-        internal void RaiseMergeFailed(DataTable table, string conflict, MissingSchemaAction missingSchemaAction)
+        internal void RaiseMergeFailed(DataTable? table, string conflict, MissingSchemaAction missingSchemaAction)
         {
             if (MissingSchemaAction.Error == missingSchemaAction)
             {
@@ -3056,7 +3131,7 @@ namespace System.Data
 
         internal void OnDataRowCreated(DataRow row) => DataRowCreated?.Invoke(this, row);
 
-        internal void OnClearFunctionCalled(DataTable table) => ClearFunctionCalled?.Invoke(this, table);
+        internal void OnClearFunctionCalled(DataTable? table) => ClearFunctionCalled?.Invoke(this, table);
 
         private void OnInitialized() => Initialized?.Invoke(this, EventArgs.Empty);
 
@@ -3067,7 +3142,7 @@ namespace System.Data
 
         internal void OnRemovedTable(DataTable table)
         {
-            DataViewManager viewManager = _defaultViewManager;
+            DataViewManager? viewManager = _defaultViewManager;
             if (null != viewManager)
             {
                 viewManager.DataViewSettings.Remove(table);
@@ -3182,7 +3257,7 @@ namespace System.Data
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.ValidateCaseConstraint|INFO> {0}", ObjectID);
             try
             {
-                DataRelation relation = null;
+                DataRelation? relation = null;
                 for (int i = 0; i < Relations.Count; i++)
                 {
                     relation = Relations[i];
@@ -3192,8 +3267,8 @@ namespace System.Data
                     }
                 }
 
-                ForeignKeyConstraint constraint = null;
-                ConstraintCollection constraints = null;
+                ForeignKeyConstraint? constraint = null;
+                ConstraintCollection? constraints = null;
                 for (int i = 0; i < Tables.Count; i++)
                 {
                     constraints = Tables[i].Constraints;
@@ -3202,7 +3277,7 @@ namespace System.Data
                         if (constraints[j] is ForeignKeyConstraint)
                         {
                             constraint = (ForeignKeyConstraint)constraints[j];
-                            if (constraint.Table.CaseSensitive != constraint.RelatedTable.CaseSensitive)
+                            if (constraint.Table!.CaseSensitive != constraint.RelatedTable.CaseSensitive)
                             {
                                 return false;
                             }
@@ -3222,7 +3297,7 @@ namespace System.Data
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.ValidateLocaleConstraint|INFO> {0}", ObjectID);
             try
             {
-                DataRelation relation = null;
+                DataRelation? relation = null;
                 for (int i = 0; i < Relations.Count; i++)
                 {
                     relation = Relations[i];
@@ -3232,8 +3307,8 @@ namespace System.Data
                     }
                 }
 
-                ForeignKeyConstraint constraint = null;
-                ConstraintCollection constraints = null;
+                ForeignKeyConstraint? constraint = null;
+                ConstraintCollection? constraints = null;
                 for (int i = 0; i < Tables.Count; i++)
                 {
                     constraints = Tables[i].Constraints;
@@ -3242,7 +3317,7 @@ namespace System.Data
                         if (constraints[j] is ForeignKeyConstraint)
                         {
                             constraint = (ForeignKeyConstraint)constraints[j];
-                            if (constraint.Table.Locale.LCID != constraint.RelatedTable.Locale.LCID)
+                            if (constraint.Table!.Locale.LCID != constraint.RelatedTable.Locale.LCID)
                             {
                                 return false;
                             }
@@ -3258,7 +3333,7 @@ namespace System.Data
         }
 
         // SDUB: may be better to rewrite this as nonrecursive?
-        internal DataTable FindTable(DataTable baseTable, PropertyDescriptor[] props, int propStart)
+        internal DataTable? FindTable(DataTable? baseTable, PropertyDescriptor[] props, int propStart)
         {
             if (props.Length < propStart + 1)
             {
@@ -3285,6 +3360,7 @@ namespace System.Data
             return null;
         }
 
+        [RequiresUnreferencedCode(RequiresUnreferencedCodeMessage)]
         protected virtual void ReadXmlSerializable(XmlReader reader)
         {
             // <DataSet xsi:nil="true"> does not mean DataSet is null,but it does not have any child
@@ -3297,7 +3373,7 @@ namespace System.Data
                 const string xsinill = Keywords.XSI + ":" + Keywords.XSI_NIL;
                 if (reader.MoveToAttribute(xsinill))
                 {
-                    string nilAttrib = reader.GetAttribute(xsinill);
+                    string? nilAttrib = reader.GetAttribute(xsinill);
                     if (string.Equals(nilAttrib, "true", StringComparison.Ordinal))
                     {
                         // case sensitive true comparison
@@ -3309,7 +3385,7 @@ namespace System.Data
                 const string UseDataSetSchemaOnlyString = Keywords.MSD + ":" + Keywords.USEDATASETSCHEMAONLY;
                 if (reader.MoveToAttribute(UseDataSetSchemaOnlyString))
                 {
-                    string useDataSetSchemaOnly = reader.GetAttribute(UseDataSetSchemaOnlyString);
+                    string? useDataSetSchemaOnly = reader.GetAttribute(UseDataSetSchemaOnlyString);
                     if (string.Equals(useDataSetSchemaOnly, "true", StringComparison.Ordinal) ||
                         string.Equals(useDataSetSchemaOnly, "1", StringComparison.Ordinal))
                     {
@@ -3318,14 +3394,14 @@ namespace System.Data
                     else if (!string.Equals(useDataSetSchemaOnly, "false", StringComparison.Ordinal) &&
                              !string.Equals(useDataSetSchemaOnly, "0", StringComparison.Ordinal))
                     {
-                        throw ExceptionBuilder.InvalidAttributeValue(Keywords.USEDATASETSCHEMAONLY, useDataSetSchemaOnly);
+                        throw ExceptionBuilder.InvalidAttributeValue(Keywords.USEDATASETSCHEMAONLY, useDataSetSchemaOnly!);
                     }
                 }
 
                 const string udtIsWrappedString = Keywords.MSD + ":" + Keywords.UDTCOLUMNVALUEWRAPPED;
                 if (reader.MoveToAttribute(udtIsWrappedString))
                 {
-                    string _udtIsWrappedString = reader.GetAttribute(udtIsWrappedString);
+                    string? _udtIsWrappedString = reader.GetAttribute(udtIsWrappedString);
                     if (string.Equals(_udtIsWrappedString, "true", StringComparison.Ordinal) ||
                         string.Equals(_udtIsWrappedString, "1", StringComparison.Ordinal))
                     {
@@ -3334,18 +3410,18 @@ namespace System.Data
                     else if (!string.Equals(_udtIsWrappedString, "false", StringComparison.Ordinal) &&
                              !string.Equals(_udtIsWrappedString, "0", StringComparison.Ordinal))
                     {
-                        throw ExceptionBuilder.InvalidAttributeValue(Keywords.UDTCOLUMNVALUEWRAPPED, _udtIsWrappedString);
+                        throw ExceptionBuilder.InvalidAttributeValue(Keywords.UDTCOLUMNVALUEWRAPPED, _udtIsWrappedString!);
                     }
                 }
             }
             ReadXml(reader, XmlReadMode.DiffGram, true);
         }
 
-        protected virtual System.Xml.Schema.XmlSchema GetSchemaSerializable() => null;
+        protected virtual System.Xml.Schema.XmlSchema? GetSchemaSerializable() => null;
 
-        public static XmlSchemaComplexType GetDataSetSchema(XmlSchemaSet schemaSet)
+        public static XmlSchemaComplexType GetDataSetSchema(XmlSchemaSet? schemaSet)
         {
-            // For performance resons we are exploiting the fact that config files content is constant
+            // For performance reasons we are exploiting the fact that config files content is constant
             // for a given appdomain so we can safely cache the prepared schema complex type and reuse it
             if (s_schemaTypeForWSDL == null)
             {
@@ -3375,7 +3451,8 @@ namespace System.Data
 
         private static bool PublishLegacyWSDL() => false;
 
-        XmlSchema IXmlSerializable.GetSchema()
+#pragma warning disable 8632
+        XmlSchema? IXmlSerializable.GetSchema()
         {
             if (GetType() == typeof(DataSet))
             {
@@ -3396,8 +3473,8 @@ namespace System.Data
         void IXmlSerializable.ReadXml(XmlReader reader)
         {
             bool fNormalization = true;
-            XmlTextReader xmlTextReader = null;
-            IXmlTextParser xmlTextParser = reader as IXmlTextParser;
+            XmlTextReader? xmlTextReader = null;
+            IXmlTextParser? xmlTextParser = reader as IXmlTextParser;
             if (xmlTextParser != null)
             {
                 fNormalization = xmlTextParser.Normalized;
@@ -3430,8 +3507,9 @@ namespace System.Data
             WriteXmlSchema(writer, SchemaFormat.WebService, null);
             WriteXml(writer, XmlWriteMode.DiffGram);
         }
+#pragma warning restore 8632
 
-        public virtual void Load(IDataReader reader, LoadOption loadOption, FillErrorEventHandler errorHandler, params DataTable[] tables)
+        public virtual void Load(IDataReader reader, LoadOption loadOption, FillErrorEventHandler? errorHandler, params DataTable[] tables)
         {
             long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataSet.Load|API> reader, loadOption={0}", loadOption);
             try
@@ -3474,7 +3552,7 @@ namespace System.Data
             var dataTables = new DataTable[tables.Length];
             for (int i = 0; i < tables.Length; i++)
             {
-                DataTable tempDT = Tables[tables[i]];
+                DataTable? tempDT = Tables[tables[i]];
                 if (null == tempDT)
                 {
                     tempDT = new DataTable(tables[i]);

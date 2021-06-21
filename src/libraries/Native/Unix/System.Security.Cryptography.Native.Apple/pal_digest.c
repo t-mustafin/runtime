@@ -46,7 +46,7 @@ DigestCtx* AppleCryptoNative_DigestCreate(PAL_HashAlgorithm algorithm, int32_t* 
         case PAL_MD5:
             *pcbDigest = CC_MD5_DIGEST_LENGTH;
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations" 
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
             CC_MD5_Init(&digestCtx->d.md5);
 #pragma clang diagnostic pop
             break;
@@ -142,6 +142,78 @@ int32_t AppleCryptoNative_DigestFinal(DigestCtx* ctx, uint8_t* pOutput, int32_t 
         return ret;
     }
 
+    return AppleCryptoNative_DigestReset(ctx);
+}
+
+int32_t AppleCryptoNative_DigestCurrent(const DigestCtx* ctx, uint8_t* pOutput, int32_t cbOutput)
+{
+    if (ctx == NULL || pOutput == NULL || cbOutput < ctx->cbDigest)
+        return -1;
+
+    DigestCtx dup = *ctx;
+    return AppleCryptoNative_DigestFinal(&dup, pOutput, cbOutput);
+}
+
+int32_t AppleCryptoNative_DigestOneShot(PAL_HashAlgorithm algorithm, uint8_t* pBuf, int32_t cbBuf, uint8_t* pOutput, int32_t cbOutput, int32_t* pcbDigest)
+{
+    if (pOutput == NULL || cbOutput <= 0 || pcbDigest == NULL)
+        return -1;
+
+    switch (algorithm)
+    {
+        case PAL_SHA1:
+            *pcbDigest = CC_SHA1_DIGEST_LENGTH;
+            if (cbOutput < CC_SHA1_DIGEST_LENGTH)
+            {
+                return -1;
+            }
+            CC_SHA1(pBuf, cbBuf, pOutput);
+            return 1;
+        case PAL_SHA256:
+            *pcbDigest = CC_SHA256_DIGEST_LENGTH;
+            if (cbOutput < CC_SHA256_DIGEST_LENGTH)
+            {
+                return -1;
+            }
+            CC_SHA256(pBuf, cbBuf, pOutput);
+            return 1;
+        case PAL_SHA384:
+            *pcbDigest = CC_SHA384_DIGEST_LENGTH;
+            if (cbOutput < CC_SHA384_DIGEST_LENGTH)
+            {
+                return -1;
+            }
+            CC_SHA384(pBuf, cbBuf, pOutput);
+            return 1;
+        case PAL_SHA512:
+            *pcbDigest = CC_SHA512_DIGEST_LENGTH;
+            if (cbOutput < CC_SHA512_DIGEST_LENGTH)
+            {
+                return -1;
+            }
+            CC_SHA512(pBuf, cbBuf, pOutput);
+            return 1;
+        case PAL_MD5:
+            *pcbDigest = CC_MD5_DIGEST_LENGTH;
+            if (cbOutput < CC_MD5_DIGEST_LENGTH)
+            {
+                return -1;
+            }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            CC_MD5(pBuf, cbBuf, pOutput);
+#pragma clang diagnostic pop
+            return 1;
+        default:
+            return -1;
+    }
+}
+
+int32_t AppleCryptoNative_DigestReset(DigestCtx* ctx)
+{
+    if (ctx == NULL)
+        return -1;
+
     switch (ctx->algorithm)
     {
         case PAL_MD5:
@@ -161,13 +233,6 @@ int32_t AppleCryptoNative_DigestFinal(DigestCtx* ctx, uint8_t* pOutput, int32_t 
             assert(false);
             return -2;
     }
-}
 
-int32_t AppleCryptoNative_DigestCurrent(const DigestCtx* ctx, uint8_t* pOutput, int32_t cbOutput)
-{
-    if (ctx == NULL || pOutput == NULL || cbOutput < ctx->cbDigest)
-        return -1;
-
-    DigestCtx dup = *ctx;
-    return AppleCryptoNative_DigestFinal(&dup, pOutput, cbOutput);
+    return 1;
 }

@@ -4,6 +4,7 @@
 using System.Collections;
 using System.Data.SqlTypes;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Xml;
 using System.Xml.Serialization;
@@ -12,7 +13,7 @@ namespace System.Data.Common
 {
     internal sealed class SqlBytesStorage : DataStorage
     {
-        private SqlBytes[] _values;
+        private SqlBytes[] _values = default!; // Late-initialized
 
         public SqlBytesStorage(DataColumn column)
         : base(column, typeof(SqlBytes), SqlBytes.Null, SqlBytes.Null, StorageType.SqlBytes)
@@ -25,12 +26,12 @@ namespace System.Data.Common
             {
                 switch (kind)
                 {
-                    case AggregateType.First:
+                    case AggregateType.First: // Does not seem to be implemented
                         if (records.Length > 0)
                         {
                             return _values[records[0]];
                         }
-                        return null; // no data => null
+                        return null!; // no data => null
 
                     case AggregateType.Count:
                         int count = 0;
@@ -54,7 +55,7 @@ namespace System.Data.Common
             return 0;
         }
 
-        public override int CompareValueTo(int recordNo, object value)
+        public override int CompareValueTo(int recordNo, object? value)
         {
             return 0;
         }
@@ -96,6 +97,7 @@ namespace System.Data.Common
             _values = newValues;
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override object ConvertXmlToObject(string s)
         {
             SqlBinary newValue = default;
@@ -111,6 +113,7 @@ namespace System.Data.Common
             return (new SqlBytes((SqlBinary)tmp));
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override string ConvertObjectToXml(object value)
         {
             Debug.Assert(!DataStorage.IsObjectNull(value), "we shouldn't have null here");

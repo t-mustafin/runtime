@@ -1,13 +1,11 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-#nullable enable
 using System.IO;
-using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Xml;
 using System.Xml.Serialization;
-using System.Collections.Generic;
 
 namespace System.Xml.Schema
 {
@@ -116,7 +114,7 @@ namespace System.Xml.Schema
         };
 
         //required for Parsing QName
-        private class BuilderNamespaceManager : XmlNamespaceManager
+        private sealed class BuilderNamespaceManager : XmlNamespaceManager
         {
             private readonly XmlNamespaceManager _nsMgr;
             private readonly XmlReader _reader;
@@ -676,11 +674,11 @@ namespace System.Xml.Schema
         private XmlSchemaAppInfo? _appInfo;
         private XmlSchemaDocumentation? _documentation;
         private XmlSchemaFacet? _facet;
-        private XmlNode[]? _markup;
+        private XmlNode?[]? _markup;
         private XmlSchemaRedefine? _redefine;
 
         private readonly ValidationEventHandler? _validationEventHandler;
-        private readonly ArrayList _unhandledAttributes = new ArrayList();
+        private readonly List<XmlAttribute> _unhandledAttributes = new List<XmlAttribute>();
         private Dictionary<string, string>? _namespaces;
 
         internal XsdBuilder(
@@ -779,7 +777,7 @@ namespace System.Xml.Schema
             return _currentEntry.ParseContent;
         }
 
-        internal override void ProcessMarkup(XmlNode[] markup)
+        internal override void ProcessMarkup(XmlNode?[] markup)
         {
             _markup = markup;
         }
@@ -795,12 +793,12 @@ namespace System.Xml.Schema
             {
                 if (_namespaces != null && _namespaces.Count > 0)
                 {
-                    _xso.Namespaces.Namespaces = _namespaces;
+                    _xso.Namespaces.Namespaces = _namespaces!;
                     _namespaces = null;
                 }
                 if (_unhandledAttributes.Count != 0)
                 {
-                    _xso.SetUnhandledAttributes((XmlAttribute[])_unhandledAttributes.ToArray(typeof(System.Xml.XmlAttribute)));
+                    _xso.SetUnhandledAttributes(_unhandledAttributes.ToArray());
                     _unhandledAttributes.Clear();
                 }
             }

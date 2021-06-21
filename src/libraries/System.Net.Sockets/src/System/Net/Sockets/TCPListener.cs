@@ -1,7 +1,10 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.Versioning;
+using System.Diagnostics;
 
 namespace System.Net.Sockets
 {
@@ -19,21 +22,22 @@ namespace System.Net.Sockets
         // Initializes a new instance of the TcpListener class with the specified local end point.
         public TcpListener(IPEndPoint localEP)
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Enter(this, localEP);
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, localEP);
+
             if (localEP == null)
             {
                 throw new ArgumentNullException(nameof(localEP));
             }
             _serverSocketEP = localEP;
             _serverSocket = new Socket(_serverSocketEP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            if (NetEventSource.IsEnabled) NetEventSource.Exit(this);
         }
 
         // Initializes a new instance of the TcpListener class that listens to the specified IP address
         // and port.
         public TcpListener(IPAddress localaddr, int port)
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Enter(this, localaddr);
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, localaddr);
+
             if (localaddr == null)
             {
                 throw new ArgumentNullException(nameof(localaddr));
@@ -45,7 +49,6 @@ namespace System.Net.Sockets
 
             _serverSocketEP = new IPEndPoint(localaddr, port);
             _serverSocket = new Socket(_serverSocketEP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            if (NetEventSource.IsEnabled) NetEventSource.Exit(this);
         }
 
         // Initiailizes a new instance of the TcpListener class that listens on the specified port.
@@ -111,6 +114,7 @@ namespace System.Net.Sockets
             }
         }
 
+        [SupportedOSPlatform("windows")]
         public void AllowNatTraversal(bool allowed)
         {
             if (_active)
@@ -141,12 +145,9 @@ namespace System.Net.Sockets
                 throw new ArgumentOutOfRangeException(nameof(backlog));
             }
 
-            if (NetEventSource.IsEnabled) NetEventSource.Enter(this);
-
             // Already listening.
             if (_active)
             {
-                if (NetEventSource.IsEnabled) NetEventSource.Exit(this);
                 return;
             }
 
@@ -165,19 +166,14 @@ namespace System.Net.Sockets
             }
 
             _active = true;
-            if (NetEventSource.IsEnabled) NetEventSource.Exit(this);
         }
 
         // Closes the network connection.
         public void Stop()
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Enter(this);
-
             _serverSocket?.Dispose();
             _active = false;
             _serverSocket = null;
-
-            if (NetEventSource.IsEnabled) NetEventSource.Exit(this);
         }
 
         // Determine if there are pending connection requests.
@@ -194,109 +190,62 @@ namespace System.Net.Sockets
         // Accept the first pending connection
         public Socket AcceptSocket()
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Enter(this);
-
             if (!_active)
             {
                 throw new InvalidOperationException(SR.net_stopped);
             }
 
-            Socket socket = _serverSocket!.Accept();
-
-            if (NetEventSource.IsEnabled) NetEventSource.Exit(this, socket);
-            return socket;
+            return _serverSocket!.Accept();
         }
 
         public TcpClient AcceptTcpClient()
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Enter(this);
-
             if (!_active)
             {
                 throw new InvalidOperationException(SR.net_stopped);
             }
 
             Socket acceptedSocket = _serverSocket!.Accept();
-            TcpClient returnValue = new TcpClient(acceptedSocket);
-
-            if (NetEventSource.IsEnabled) NetEventSource.Exit(this, returnValue);
-            return returnValue;
+            return new TcpClient(acceptedSocket);
         }
 
-        public IAsyncResult BeginAcceptSocket(AsyncCallback? callback, object? state)
-        {
-            if (NetEventSource.IsEnabled) NetEventSource.Enter(this);
+        public IAsyncResult BeginAcceptSocket(AsyncCallback? callback, object? state) =>
+            TaskToApm.Begin(AcceptSocketAsync(), callback, state);
 
-            if (!_active)
-            {
-                throw new InvalidOperationException(SR.net_stopped);
-            }
-
-            IAsyncResult result = _serverSocket!.BeginAccept(callback, state);
-
-            if (NetEventSource.IsEnabled) NetEventSource.Exit(this);
-            return result;
-        }
-
-        public Socket EndAcceptSocket(IAsyncResult asyncResult)
-        {
-            if (NetEventSource.IsEnabled) NetEventSource.Enter(this);
-
-            if (asyncResult == null)
-            {
-                throw new ArgumentNullException(nameof(asyncResult));
-            }
-
-            LazyAsyncResult? lazyResult = asyncResult as LazyAsyncResult;
-            Socket? asyncSocket = lazyResult == null ? null : lazyResult.AsyncObject as Socket;
-            if (asyncSocket == null)
-            {
-                throw new ArgumentException(SR.net_io_invalidasyncresult, nameof(asyncResult));
-            }
-
-            // This will throw ObjectDisposedException if Stop() has been called.
-            Socket socket = asyncSocket.EndAccept(asyncResult);
-
-            if (NetEventSource.IsEnabled) NetEventSource.Exit(this, socket);
-            return socket;
-        }
+        public Socket EndAcceptSocket(IAsyncResult asyncResult) =>
+            EndAcceptCore<Socket>(asyncResult);
 
         public IAsyncResult BeginAcceptTcpClient(AsyncCallback? callback, object? state) =>
-            BeginAcceptSocket(callback, state);
+            TaskToApm.Begin(AcceptTcpClientAsync(), callback, state);
 
         public TcpClient EndAcceptTcpClient(IAsyncResult asyncResult) =>
-            new TcpClient(EndAcceptSocket(asyncResult));
+            EndAcceptCore<TcpClient>(asyncResult);
 
-        public Task<Socket> AcceptSocketAsync()
+        public Task<Socket> AcceptSocketAsync() => AcceptSocketAsync(CancellationToken.None).AsTask();
+
+        public ValueTask<Socket> AcceptSocketAsync(CancellationToken cancellationToken)
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Enter(this);
-
             if (!_active)
             {
                 throw new InvalidOperationException(SR.net_stopped);
             }
 
-            Task<Socket> result = _serverSocket!.AcceptAsync();
-
-            if (NetEventSource.IsEnabled) NetEventSource.Exit(this);
-
-            return result;
+            return _serverSocket!.AcceptAsync(cancellationToken);
         }
 
-        public Task<TcpClient> AcceptTcpClientAsync()
-        {
-            return WaitAndWrap(AcceptSocketAsync());
+        public Task<TcpClient> AcceptTcpClientAsync() => AcceptTcpClientAsync(CancellationToken.None).AsTask();
 
-            static async Task<TcpClient> WaitAndWrap(Task<Socket> task) =>
+        public ValueTask<TcpClient> AcceptTcpClientAsync(CancellationToken cancellationToken)
+        {
+            return WaitAndWrap(AcceptSocketAsync(cancellationToken));
+
+            static async ValueTask<TcpClient> WaitAndWrap(ValueTask<Socket> task) =>
                 new TcpClient(await task.ConfigureAwait(false));
         }
-
 
         // This creates a TcpListener that listens on both IPv4 and IPv6 on the given port.
         public static TcpListener Create(int port)
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Enter(null, port);
-
             if (!TcpValidationHelpers.ValidatePortNumber(port))
             {
                 throw new ArgumentOutOfRangeException(nameof(port));
@@ -315,11 +264,10 @@ namespace System.Net.Sockets
                 listener = new TcpListener(IPAddress.Any, port);
             }
 
-            if (NetEventSource.IsEnabled) NetEventSource.Exit(null, port);
-
             return listener;
         }
 
+        [SupportedOSPlatform("windows")]
         private void SetIPProtectionLevel(bool allowed)
             => _serverSocket!.SetIPProtectionLevel(allowed ? IPProtectionLevel.Unrestricted : IPProtectionLevel.EdgeRestricted);
 
@@ -334,8 +282,23 @@ namespace System.Net.Sockets
 
             if (_allowNatTraversal != null)
             {
+                Debug.Assert(OperatingSystem.IsWindows());
                 SetIPProtectionLevel(_allowNatTraversal.GetValueOrDefault());
                 _allowNatTraversal = null; // Reset value to avoid affecting more sockets
+            }
+        }
+
+        private TResult EndAcceptCore<TResult>(IAsyncResult asyncResult)
+        {
+            try
+            {
+                return TaskToApm.End<TResult>(asyncResult);
+            }
+            catch (SocketException) when (!_active)
+            {
+                // Socket.EndAccept(iar) throws ObjectDisposedException when the underlying socket gets closed.
+                // TcpClient's documented behavior was to propagate that exception, we need to emulate it for compatibility:
+                throw new ObjectDisposedException(typeof(Socket).FullName);
             }
         }
     }

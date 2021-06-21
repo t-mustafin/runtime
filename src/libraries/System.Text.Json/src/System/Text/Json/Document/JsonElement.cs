@@ -1229,7 +1229,7 @@ namespace System.Text.Json
                 return utf8Text == default;
             }
 
-            return TextEqualsHelper(utf8Text, isPropertyName: false);
+            return TextEqualsHelper(utf8Text, isPropertyName: false, shouldUnescape: true);
         }
 
         /// <summary>
@@ -1260,11 +1260,11 @@ namespace System.Text.Json
             return TextEqualsHelper(text, isPropertyName: false);
         }
 
-        internal bool TextEqualsHelper(ReadOnlySpan<byte> utf8Text, bool isPropertyName)
+        internal bool TextEqualsHelper(ReadOnlySpan<byte> utf8Text, bool isPropertyName, bool shouldUnescape)
         {
             CheckValidInstance();
 
-            return _parent.TextEquals(_idx, utf8Text, isPropertyName);
+            return _parent.TextEquals(_idx, utf8Text, isPropertyName, shouldUnescape);
         }
 
         internal bool TextEqualsHelper(ReadOnlySpan<char> text, bool isPropertyName)
@@ -1385,7 +1385,7 @@ namespace System.Text.Json
         /// <exception cref="ObjectDisposedException">
         ///   The parent <see cref="JsonDocument"/> has been disposed.
         /// </exception>
-        public override string? ToString()
+        public override string ToString()
         {
             switch (TokenType)
             {
@@ -1402,10 +1402,10 @@ namespace System.Text.Json
                     {
                         // null parent should have hit the None case
                         Debug.Assert(_parent != null);
-                        return ((JsonDocument)_parent).GetRawValueAsString(_idx);
+                        return _parent.GetRawValueAsString(_idx);
                     }
                 case JsonTokenType.String:
-                    return GetString();
+                    return GetString()!;
                 case JsonTokenType.Comment:
                 case JsonTokenType.EndArray:
                 case JsonTokenType.EndObject:

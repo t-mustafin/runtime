@@ -1,8 +1,8 @@
 ' Licensed to the .NET Foundation under one or more agreements.
 ' The .NET Foundation licenses this file to you under the MIT license.
-' See the LICENSE file in the project root for more information.
 
 Imports System
+Imports System.Diagnostics.CodeAnalysis
 Imports System.Dynamic
 Imports Microsoft.VisualBasic.CompilerServices.Utils
 
@@ -14,6 +14,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         Private Sub New()
         End Sub
 
+        <RequiresUnreferencedCode("The method name cannot and type cannot be statically analyzed so it may be trimmed")>
         Public Shared Function CallByName(ByVal Instance As System.Object, ByVal MethodName As String, ByVal UseCallType As CallType, ByVal ParamArray Arguments() As Object) As Object
 
             Select Case UseCallType
@@ -111,7 +112,15 @@ Namespace Microsoft.VisualBasic.CompilerServices
             End If
 
             typ = Expression.GetType()
+#If TARGET_WINDOWS Then
+            If (typ.IsCOMObject AndAlso (System.String.CompareOrdinal(typ.Name, COMObjectName) = 0)) Then
+                Result = TypeNameOfCOMObject(Expression, True)
+            Else
+                Result = VBFriendlyNameOfType(typ)
+            End If
+#Else
             Result = VBFriendlyNameOfType(typ)
+#End If
             Return Result
         End Function
 

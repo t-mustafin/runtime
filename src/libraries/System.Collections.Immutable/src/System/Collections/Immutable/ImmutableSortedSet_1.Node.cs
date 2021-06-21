@@ -184,14 +184,13 @@ namespace System.Collections.Immutable
             /// Gets the maximum value in the collection, as defined by the comparer.
             /// </summary>
             /// <value>The maximum value in the set.</value>
-            [MaybeNull]
-            internal T Max
+            internal T? Max
             {
                 get
                 {
                     if (this.IsEmpty)
                     {
-                        return default(T)!;
+                        return default;
                     }
 
                     Node n = this;
@@ -208,14 +207,13 @@ namespace System.Collections.Immutable
             /// Gets the minimum value in the collection, as defined by the comparer.
             /// </summary>
             /// <value>The minimum value in the set.</value>
-            [MaybeNull]
-            internal T Min
+            internal T? Min
             {
                 get
                 {
                     if (this.IsEmpty)
                     {
-                        return default(T)!;
+                        return default;
                     }
 
                     Node n = this;
@@ -254,7 +252,6 @@ namespace System.Collections.Immutable
                 }
             }
 
-#if !NETSTANDARD1_0
             /// <summary>
             /// Gets a read-only reference to the element of the set at the given index.
             /// </summary>
@@ -277,7 +274,6 @@ namespace System.Collections.Immutable
 
                 return ref _key;
             }
-#endif
 
             #region IEnumerable<T> Members
 

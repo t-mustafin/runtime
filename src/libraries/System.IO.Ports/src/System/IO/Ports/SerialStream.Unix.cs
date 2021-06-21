@@ -403,7 +403,7 @@ namespace System.IO.Ports
             return Read(array, offset, count, ReadTimeout);
         }
 
-        internal unsafe int Read(byte[] array, int offset, int count, int timeout)
+        internal int Read(byte[] array, int offset, int count, int timeout)
         {
             using (CancellationTokenSource cts = GetCancellationTokenSourceFromTimeout(timeout))
             {
@@ -564,7 +564,18 @@ namespace System.IO.Ports
                     throw new ArgumentException();
                 }
 
-                DtrEnable = dtrEnable;
+                try
+                {
+                    DtrEnable = dtrEnable;
+                }
+                catch (IOException) when (dtrEnable == false)
+                {
+                    // An IOException can be thrown when using a virtual port from eg. socat, which doesn't implement
+                    // the required termios command for setting DtrEnable, but it still works without setting the value
+                    // so we ignore this error in the constructor only if being set to false (which is the default).
+                    // When the property is set manually the exception is still thrown.
+                }
+
                 BaudRate = baudRate;
 
                 // now set this.RtsEnable to the specified value.
@@ -572,10 +583,20 @@ namespace System.IO.Ports
                 // handshake is either RequestToSend or RequestToSendXOnXOff
                 if ((handshake != Handshake.RequestToSend && handshake != Handshake.RequestToSendXOnXOff))
                 {
-                    // query and cache the initial RtsEnable value
-                    // so that set_RtsEnable can do the (value != rtsEnable) optimization
-                    _rtsEnable = RtsEnabledNative();
-                    RtsEnable = rtsEnable;
+                    try
+                    {
+                        // query and cache the initial RtsEnable value
+                        // so that set_RtsEnable can do the (value != rtsEnable) optimization
+                        _rtsEnable = RtsEnabledNative();
+                        RtsEnable = rtsEnable;
+                    }
+                    catch (IOException) when (rtsEnable == false)
+                    {
+                        // An IOException can be thrown when using a virtual port from eg. socat, which doesn't implement
+                        // the required termios command for setting RtsEnable, but it still works without setting the value
+                        // so we ignore this error in the constructor only if being set to false (which is the default).
+                        // When the property is set manually the exception is still thrown.
+                    }
                 }
             }
             catch
@@ -786,7 +807,7 @@ namespace System.IO.Ports
             return 0;
         }
 
-        private unsafe void IOLoop()
+        private void IOLoop()
         {
             bool eofReceived = false;
             // we do not care about bytes we got before - only about changes
@@ -941,7 +962,7 @@ namespace System.IO.Ports
             return Interop.GetIOException(Interop.Sys.GetLastErrorInfo());
         }
 
-        private class SerialStreamIORequest : TaskCompletionSource<int>
+        private sealed class SerialStreamIORequest : TaskCompletionSource<int>
         {
             public Memory<byte> Buffer { get; private set; }
             public bool IsCompleted => Task.IsCompleted;

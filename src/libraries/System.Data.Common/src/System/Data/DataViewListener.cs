@@ -4,14 +4,15 @@
 using System.ComponentModel;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data
 {
     internal sealed class DataViewListener
     {
         private readonly WeakReference _dvWeak;
-        private DataTable _table;
-        private Index _index;
+        private DataTable? _table;
+        private Index? _index;
 
         /// <summary><see cref="DataView.ObjectID"/></summary>
         internal readonly int _objectID;
@@ -24,7 +25,7 @@ namespace System.Data
 
         private void ChildRelationCollectionChanged(object sender, CollectionChangeEventArgs e)
         {
-            DataView dv = (DataView)_dvWeak.Target;
+            DataView? dv = (DataView?)_dvWeak.Target;
             if (dv != null)
             {
                 dv.ChildRelationCollectionChanged(sender, e);
@@ -37,7 +38,7 @@ namespace System.Data
 
         private void ParentRelationCollectionChanged(object sender, CollectionChangeEventArgs e)
         {
-            DataView dv = (DataView)_dvWeak.Target;
+            DataView? dv = (DataView?)_dvWeak.Target;
             if (dv != null)
             {
                 dv.ParentRelationCollectionChanged(sender, e);
@@ -50,7 +51,7 @@ namespace System.Data
 
         private void ColumnCollectionChanged(object sender, CollectionChangeEventArgs e)
         {
-            DataView dv = (DataView)_dvWeak.Target;
+            DataView? dv = (DataView?)_dvWeak.Target;
             if (dv != null)
             {
                 dv.ColumnCollectionChangedInternal(sender, e);
@@ -64,9 +65,9 @@ namespace System.Data
         /// <summary>
         /// Maintain the DataView before <see cref="DataView.ListChanged"/> is raised.
         /// </summary>
-        internal void MaintainDataView(ListChangedType changedType, DataRow row, bool trackAddRemove)
+        internal void MaintainDataView(ListChangedType changedType, DataRow? row, bool trackAddRemove)
         {
-            DataView dv = (DataView)_dvWeak.Target;
+            DataView? dv = (DataView?)_dvWeak.Target;
             if (dv != null)
             {
                 dv.MaintainDataView(changedType, row, trackAddRemove);
@@ -79,7 +80,7 @@ namespace System.Data
 
         internal void IndexListChanged(ListChangedEventArgs e)
         {
-            DataView dv = (DataView)_dvWeak.Target;
+            DataView? dv = (DataView?)_dvWeak.Target;
             if (dv != null)
             {
                 dv.IndexListChangedInternal(e);
@@ -90,7 +91,7 @@ namespace System.Data
             }
         }
 
-        internal void RegisterMetaDataEvents(DataTable table)
+        internal void RegisterMetaDataEvents(DataTable? table)
         {
             Debug.Assert(null == _table, "DataViewListener already registered table");
             _table = table;
@@ -118,7 +119,7 @@ namespace System.Data
 
         private void UnregisterMetaDataEvents(bool updateListeners)
         {
-            DataTable table = _table;
+            DataTable? table = _table;
             _table = null;
 
             if (table != null)
@@ -162,7 +163,7 @@ namespace System.Data
 
         internal void UnregisterListChangedEvent()
         {
-            Index index = _index;
+            Index? index = _index;
             _index = null;
 
             if (index != null)

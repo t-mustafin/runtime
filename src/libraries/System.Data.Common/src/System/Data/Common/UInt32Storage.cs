@@ -3,6 +3,7 @@
 
 using System.Xml;
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data.Common
 {
@@ -10,7 +11,7 @@ namespace System.Data.Common
     {
         private const uint DefaultValue = uint.MinValue;
 
-        private uint[] _values;
+        private uint[] _values = default!; // Late-initialized
 
         public UInt32Storage(DataColumn column)
         : base(column, typeof(uint), DefaultValue, StorageType.UInt32)
@@ -134,12 +135,12 @@ namespace System.Data.Common
                         }
                         return _nullValue;
 
-                    case AggregateType.First:
+                    case AggregateType.First: // Does not seem to be implemented
                         if (records.Length > 0)
                         {
                             return _values[records[0]];
                         }
-                        return null;
+                        return null!;
 
                     case AggregateType.Count:
                         count = 0;
@@ -176,7 +177,7 @@ namespace System.Data.Common
             return (valueNo1 < valueNo2 ? -1 : (valueNo1 > valueNo2 ? 1 : 0)); // similar to UInt32.CompareTo(UInt32)
         }
 
-        public override int CompareValueTo(int recordNo, object value)
+        public override int CompareValueTo(int recordNo, object? value)
         {
             System.Diagnostics.Debug.Assert(0 <= recordNo, "Invalid record");
             System.Diagnostics.Debug.Assert(null != value, "null value");
@@ -195,7 +196,7 @@ namespace System.Data.Common
             //return(valueNo1 < valueNo2 ? -1 : (valueNo1 > valueNo2 ? 1 : 0)); // similar to UInt32.CompareTo(UInt32)
         }
 
-        public override object ConvertValue(object value)
+        public override object ConvertValue(object? value)
         {
             if (_nullValue != value)
             {
@@ -253,11 +254,13 @@ namespace System.Data.Common
             base.SetCapacity(capacity);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override object ConvertXmlToObject(string s)
         {
             return XmlConvert.ToUInt32(s);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override string ConvertObjectToXml(object value)
         {
             return XmlConvert.ToString((uint)value);

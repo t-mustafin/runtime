@@ -1,16 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
-// See the LICENSE file in the project root for more information
-//
+// The .NET Foundation licenses this file to you under the MIT license.
+
 // EncryptedXmlTest.cs
 //
 // Author:
 //  Atsushi Enomoto  <atsushi@ximian.com>
 //
 // Copyright (C) 2006 Novell, Inc (http://www.novell.com)
-//
-// Licensed to the .NET Foundation under one or more agreements.
-// See the LICENSE file in the project root for more information.
-
 
 using System.Collections;
 using System.Collections.Generic;
@@ -93,6 +89,7 @@ namespace System.Security.Cryptography.Xml.Tests
         [Theory]
         [InlineData("System.Security.Cryptography.Xml.Tests.EncryptedXmlSample1.xml")]
         [InlineData("System.Security.Cryptography.Xml.Tests.EncryptedXmlSample3.xml")]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/51370", TestPlatforms.iOS | TestPlatforms.tvOS | TestPlatforms.MacCatalyst)]
         public void RsaDecryption(string resourceName)
         {
             XmlDocument doc = new XmlDocument();
@@ -143,9 +140,10 @@ namespace System.Security.Cryptography.Xml.Tests
         {
             using (Aes aes = Aes.Create())
             {
+                byte[] keydata = Convert.FromBase64String("o/ilseZu+keLBBWGGPlUHweqxIPc4gzZEFWr2nBt640=");
                 aes.Mode = CipherMode.CBC;
                 aes.KeySize = 256;
-                aes.Key = Convert.FromBase64String("o/ilseZu+keLBBWGGPlUHweqxIPc4gzZEFWr2nBt640=");
+                aes.Key = keydata;
                 aes.Padding = PaddingMode.Zeros;
 
                 XmlDocument doc = new XmlDocument();
@@ -174,10 +172,11 @@ namespace System.Security.Cryptography.Xml.Tests
 
                     using (Aes aes = Aes.Create())
                     {
+                        byte[] keydata = Convert.FromBase64String("o/ilseZu+keLBBWGGPlUHweqxIPc4gzZEFWr2nBt640=");
                         aes.Mode = CipherMode.CBC;
                         aes.KeySize = 256;
                         aes.IV = Convert.FromBase64String("pBUM5P03rZ6AE4ZK5EyBrw==");
-                        aes.Key = Convert.FromBase64String("o/ilseZu+keLBBWGGPlUHweqxIPc4gzZEFWr2nBt640=");
+                        aes.Key = keydata;
                         aes.Padding = PaddingMode.Zeros;
 
                         EncryptedXml exml = new EncryptedXml();
@@ -205,10 +204,10 @@ namespace System.Security.Cryptography.Xml.Tests
                 {
                     using (Aes aes = Aes.Create())
                     {
+                        byte[] keydata = Convert.FromBase64String("o/ilseZu+keLBBWGGPlUHweqxIPc4gzZEFWr2nBt640=");
                         aes.Mode = CipherMode.CBC;
                         aes.KeySize = 256;
-                        aes.Key = Convert.FromBase64String(
-                            "o/ilseZu+keLBBWGGPlUHweqxIPc4gzZEFWr2nBt640=");
+                        aes.Key = keydata;
                         aes.Padding = PaddingMode.Zeros;
 
                         XmlDocument doc = new XmlDocument();
@@ -247,6 +246,7 @@ namespace System.Security.Cryptography.Xml.Tests
         }
 
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/51370", TestPlatforms.iOS | TestPlatforms.tvOS | TestPlatforms.MacCatalyst)]
         public void Encrypt_X509()
         {
             XmlDocument doc = new XmlDocument();
@@ -271,6 +271,7 @@ namespace System.Security.Cryptography.Xml.Tests
         }
 
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/51370", TestPlatforms.iOS | TestPlatforms.tvOS | TestPlatforms.MacCatalyst)]
         public void Encrypt_X509_XmlNull()
         {
             using (X509Certificate2 certificate = TestHelpers.GetSampleX509Certificate())

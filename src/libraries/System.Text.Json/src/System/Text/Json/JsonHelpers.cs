@@ -4,6 +4,7 @@
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace System.Text.Json
@@ -117,6 +118,28 @@ namespace System.Text.Json
 #endif
         }
 
+        /// <summary>
+        /// Emulates Dictionary(IEnumerable{KeyValuePair}) on netstandard.
+        /// </summary>
+        public static Dictionary<TKey, TValue> CreateDictionaryFromCollection<TKey, TValue>(
+            IEnumerable<KeyValuePair<TKey, TValue>> collection,
+            IEqualityComparer<TKey> comparer)
+            where TKey : notnull
+        {
+#if NETSTANDARD2_0 || NETFRAMEWORK
+            var dictionary = new Dictionary<TKey, TValue>(comparer);
+
+            foreach (KeyValuePair<TKey, TValue> item in collection)
+            {
+                dictionary.Add(item.Key, item.Value);
+            }
+
+            return dictionary;
+#else
+            return new Dictionary<TKey, TValue>(collection: collection, comparer);
+#endif
+        }
+
         public static bool IsFinite(double value)
         {
 #if BUILDING_INBOX_LIBRARY
@@ -133,6 +156,15 @@ namespace System.Text.Json
 #else
             return !(float.IsNaN(value) || float.IsInfinity(value));
 #endif
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void ValidateInt32MaxArrayLength(uint length)
+        {
+            if (length > 0X7FEFFFFF) // prior to .NET 6, max array length for sizeof(T) != 1 (size == 1 is larger)
+            {
+                ThrowHelper.ThrowOutOfMemoryException(length);
+            }
         }
     }
 }

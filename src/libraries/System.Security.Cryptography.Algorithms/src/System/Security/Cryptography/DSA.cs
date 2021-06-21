@@ -3,13 +3,16 @@
 
 using System.Buffers;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Formats.Asn1;
 using System.IO;
+using System.Runtime.Versioning;
 using System.Security.Cryptography.Asn1;
 using Internal.Cryptography;
 
 namespace System.Security.Cryptography
 {
+    [UnsupportedOSPlatform("browser")]
     public abstract partial class DSA : AsymmetricAlgorithm
     {
         // As of FIPS 186-4 the maximum Q size is 256 bits (32 bytes).
@@ -26,14 +29,26 @@ namespace System.Security.Cryptography
 
         protected DSA() { }
 
+        [RequiresUnreferencedCode(CryptoConfig.CreateFromNameUnreferencedCodeMessage)]
         public static new DSA? Create(string algName)
         {
             return (DSA?)CryptoConfig.CreateFromName(algName);
         }
 
+        [UnsupportedOSPlatform("ios")]
+        [UnsupportedOSPlatform("maccatalyst")]
+        [UnsupportedOSPlatform("tvos")]
+        public static new DSA Create()
+        {
+            return CreateCore();
+        }
+
+        [UnsupportedOSPlatform("ios")]
+        [UnsupportedOSPlatform("maccatalyst")]
+        [UnsupportedOSPlatform("tvos")]
         public static DSA Create(int keySizeInBits)
         {
-            DSA dsa = Create();
+            DSA dsa = CreateCore();
 
             try
             {
@@ -47,9 +62,12 @@ namespace System.Security.Cryptography
             }
         }
 
+        [UnsupportedOSPlatform("ios")]
+        [UnsupportedOSPlatform("maccatalyst")]
+        [UnsupportedOSPlatform("tvos")]
         public static DSA Create(DSAParameters parameters)
         {
-            DSA dsa = Create();
+            DSA dsa = CreateCore();
 
             try
             {

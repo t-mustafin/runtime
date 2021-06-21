@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Globalization;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography.Pkcs;
 using Test.Cryptography;
 using Xunit;
@@ -39,7 +38,7 @@ namespace System.Security.Cryptography.X509Certificates.Tests
         //
         // Our Unix loader matches the current Windows 10 behavior.
         private static readonly bool s_loaderFailsKeysEarly =
-            RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+            OperatingSystem.IsWindows() &&
             !PlatformDetection.IsWindows10Version1607OrGreater;
 
         protected abstract void ReadPfx(
@@ -66,6 +65,7 @@ namespace System.Security.Cryptography.X509Certificates.Tests
             int altWin32Error = 0);
 
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50937", TestPlatforms.Android)]
         public void EmptyPfx_NoMac()
         {
             Pkcs12Builder builder = new Pkcs12Builder();
@@ -74,6 +74,7 @@ namespace System.Security.Cryptography.X509Certificates.Tests
         }
 
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50937", TestPlatforms.Android)]
         public void EmptyPfx_NoMac_ArbitraryPassword()
         {
             Pkcs12Builder builder = new Pkcs12Builder();
@@ -85,6 +86,7 @@ namespace System.Security.Cryptography.X509Certificates.Tests
         }
 
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50937", TestPlatforms.Android)]
         public void EmptyPfx_EmptyPassword()
         {
             Pkcs12Builder builder = new Pkcs12Builder();
@@ -96,6 +98,7 @@ namespace System.Security.Cryptography.X509Certificates.Tests
         }
 
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50937", TestPlatforms.Android)]
         public void EmptyPfx_NullPassword()
         {
             Pkcs12Builder builder = new Pkcs12Builder();
@@ -107,6 +110,7 @@ namespace System.Security.Cryptography.X509Certificates.Tests
         }
 
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50937", TestPlatforms.Android)]
         public void EmptyPfx_BadPassword()
         {
             Pkcs12Builder builder = new Pkcs12Builder();
@@ -220,7 +224,7 @@ namespace System.Security.Cryptography.X509Certificates.Tests
                 byte[] pfxBytes = builder.Encode();
 
                 // On macOS the cert will come back with HasPrivateKey being false.
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                if (OperatingSystem.IsMacOS())
                 {
                     using (var publicCert = new X509Certificate2(cert.RawData))
                     {
@@ -282,7 +286,7 @@ namespace System.Security.Cryptography.X509Certificates.Tests
 
                 // On macOS the cert will come back with HasPrivateKey being false when the
                 // incorrect key comes first
-                if (!correctKeyFirst && RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                if (!correctKeyFirst && OperatingSystem.IsMacOS())
                 {
                     using (var publicCert = new X509Certificate2(cert.RawData))
                     {
@@ -906,7 +910,7 @@ namespace System.Security.Cryptography.X509Certificates.Tests
                     // Obviously this hit some sort of weird corner case in the Win7
                     // loader, but it's not important to the test.
 
-                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+                    if (OperatingSystem.IsWindows() &&
                         !PlatformDetection.IsWindows8xOrLater)
                     {
                         followup = null;

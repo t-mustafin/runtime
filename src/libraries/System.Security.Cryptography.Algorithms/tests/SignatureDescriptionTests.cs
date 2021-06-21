@@ -8,6 +8,7 @@ using Xunit;
 
 namespace System.Security.Cryptography.Algorithms.Tests
 {
+    [SkipOnPlatform(TestPlatforms.Browser, "Not supported on Browser")]
     public class SignatureDescriptionTests
     {
         [Fact]
@@ -38,6 +39,7 @@ namespace System.Security.Cryptography.Algorithms.Tests
         }
 
         [Fact]
+        [SkipOnPlatform(TestPlatforms.iOS | TestPlatforms.tvOS | TestPlatforms.MacCatalyst, "Not supported on iOS/tvOS/MacCatalyst")]
         public void Constructor_SecurityElement_DSA()
         {
             SecurityElement se = new SecurityElement("DSASignature");
@@ -101,6 +103,7 @@ namespace System.Security.Cryptography.Algorithms.Tests
         }
 
         [Fact]
+        [SkipOnPlatform(TestPlatforms.iOS | TestPlatforms.tvOS | TestPlatforms.MacCatalyst, "Not supported on iOS/tvOS/MacCatalyst")]
         public void Deformatter()
         {
             AsymmetricSignatureDeformatter def;
@@ -172,6 +175,7 @@ namespace System.Security.Cryptography.Algorithms.Tests
         }
 
         [Fact]
+        [SkipOnPlatform(TestPlatforms.iOS | TestPlatforms.tvOS | TestPlatforms.MacCatalyst, "Not supported on iOS/tvOS/MacCatalyst")]
         public void Formatter()
         {
             SignatureDescription sig = new SignatureDescription();

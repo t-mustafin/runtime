@@ -1,10 +1,14 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+// TODO: Enable after System.Private.Xml is annotated
+#nullable disable
+
 using System.Diagnostics;
 using System.Collections;
 using System.Xml;
 using System.Xml.Serialization;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data
 {
@@ -14,6 +18,7 @@ namespace System.Data
         private DataSet _dataSet;
         private DataTable _dataTable;
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal void LoadDiffGram(DataSet ds, XmlReader dataTextReader)
         {
             XmlReader reader = DataTextReader.CreateReader(dataTextReader);
@@ -45,6 +50,7 @@ namespace System.Data
             }
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal void LoadDiffGram(DataTable dt, XmlReader dataTextReader)
         {
             XmlReader reader = DataTextReader.CreateReader(dataTextReader);
@@ -67,6 +73,7 @@ namespace System.Data
             }
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal void ProcessDiffs(DataSet ds, XmlReader ssync)
         {
             DataTable tableBefore;
@@ -118,6 +125,8 @@ namespace System.Data
 
             return;
         }
+
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal void ProcessDiffs(ArrayList tableList, XmlReader ssync)
         {
             DataTable tableBefore;
@@ -171,7 +180,7 @@ namespace System.Data
             return;
         }
 
-
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal void ProcessErrors(DataSet ds, XmlReader ssync)
         {
             DataTable table;
@@ -211,6 +220,7 @@ namespace System.Data
             return;
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal void ProcessErrors(ArrayList dt, XmlReader ssync)
         {
             DataTable table;
@@ -281,6 +291,7 @@ namespace System.Data
             return null;
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         private int ReadOldRowData(DataSet ds, ref DataTable table, ref int pos, XmlReader row)
         {
             // read table information

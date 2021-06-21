@@ -11,40 +11,62 @@ namespace Internal.Cryptography
 {
     internal static partial class HashProviderDispenser
     {
-        public static HashProvider CreateHashProvider(string hashAlgorithmId)
+        internal static HashProvider CreateHashProvider(string hashAlgorithmId)
         {
-            switch (hashAlgorithmId)
-            {
-                case HashAlgorithmNames.SHA1:
-                    return new EvpHashProvider(Interop.Crypto.EvpSha1());
-                case HashAlgorithmNames.SHA256:
-                    return new EvpHashProvider(Interop.Crypto.EvpSha256());
-                case HashAlgorithmNames.SHA384:
-                    return new EvpHashProvider(Interop.Crypto.EvpSha384());
-                case HashAlgorithmNames.SHA512:
-                    return new EvpHashProvider(Interop.Crypto.EvpSha512());
-                case HashAlgorithmNames.MD5:
-                    return new EvpHashProvider(Interop.Crypto.EvpMd5());
-            }
-            throw new CryptographicException(SR.Format(SR.Cryptography_UnknownHashAlgorithm, hashAlgorithmId));
+            IntPtr evpType = Interop.Crypto.HashAlgorithmToEvp(hashAlgorithmId);
+            return new EvpHashProvider(evpType);
         }
 
-        public static unsafe HashProvider CreateMacProvider(string hashAlgorithmId, ReadOnlySpan<byte> key)
+        internal static HashProvider CreateMacProvider(string hashAlgorithmId, ReadOnlySpan<byte> key)
         {
-            switch (hashAlgorithmId)
+            IntPtr evpType = Interop.Crypto.HashAlgorithmToEvp(hashAlgorithmId);
+            return new HmacHashProvider(evpType, key);
+        }
+
+        internal static class OneShotHashProvider
+        {
+            public static int MacData(
+                string hashAlgorithmId,
+                ReadOnlySpan<byte> key,
+                ReadOnlySpan<byte> source,
+                Span<byte> destination)
             {
-                case HashAlgorithmNames.SHA1:
-                    return new HmacHashProvider(Interop.Crypto.EvpSha1(), key);
-                case HashAlgorithmNames.SHA256:
-                    return new HmacHashProvider(Interop.Crypto.EvpSha256(), key);
-                case HashAlgorithmNames.SHA384:
-                    return new HmacHashProvider(Interop.Crypto.EvpSha384(), key);
-                case HashAlgorithmNames.SHA512:
-                    return new HmacHashProvider(Interop.Crypto.EvpSha512(), key);
-                case HashAlgorithmNames.MD5:
-                    return new HmacHashProvider(Interop.Crypto.EvpMd5(), key);
+                IntPtr evpType = Interop.Crypto.HashAlgorithmToEvp(hashAlgorithmId);
+                Debug.Assert(evpType != IntPtr.Zero);
+
+                int hashSize = Interop.Crypto.EvpMdSize(evpType);
+
+                if (hashSize <= 0 || destination.Length < hashSize)
+                {
+                    Debug.Fail("Destination length or hash size not valid.");
+                    throw new CryptographicException();
+                }
+
+                int written = Interop.Crypto.HmacOneShot(evpType, key, source, destination);
+                Debug.Assert(written == hashSize);
+                return written;
             }
-            throw new CryptographicException(SR.Format(SR.Cryptography_UnknownHashAlgorithm, hashAlgorithmId));
+
+            public static unsafe int HashData(string hashAlgorithmId, ReadOnlySpan<byte> source, Span<byte> destination)
+            {
+                IntPtr evpType = Interop.Crypto.HashAlgorithmToEvp(hashAlgorithmId);
+                Debug.Assert(evpType != IntPtr.Zero);
+
+                int hashSize = Interop.Crypto.EvpMdSize(evpType);
+
+                if (hashSize <= 0 || destination.Length < hashSize)
+                    throw new CryptographicException();
+
+                fixed (byte* pSource = source)
+                fixed (byte* pDestination = destination)
+                {
+                    uint length = (uint)destination.Length;
+                    Check(Interop.Crypto.EvpDigestOneShot(evpType, pSource, source.Length, pDestination, ref length));
+                    Debug.Assert(length == hashSize);
+                }
+
+                return hashSize;
+            }
         }
 
         private sealed class EvpHashProvider : HashProvider
@@ -52,6 +74,7 @@ namespace Internal.Cryptography
             private readonly IntPtr _algorithmEvp;
             private readonly int _hashSize;
             private readonly SafeEvpMdCtxHandle _ctx;
+            private bool _running;
 
             public EvpHashProvider(IntPtr algorithmEvp)
             {
@@ -69,8 +92,11 @@ namespace Internal.Cryptography
                 Interop.Crypto.CheckValidOpenSslHandle(_ctx);
             }
 
-            public override void AppendHashData(ReadOnlySpan<byte> data) =>
+            public override void AppendHashData(ReadOnlySpan<byte> data)
+            {
+                _running = true;
                 Check(Interop.Crypto.EvpDigestUpdate(_ctx, data, data.Length));
+            }
 
             public override int FinalizeHashAndReset(Span<byte> destination)
             {
@@ -82,6 +108,7 @@ namespace Internal.Cryptography
 
                 // Reset the algorithm provider.
                 Check(Interop.Crypto.EvpDigestReset(_ctx, _algorithmEvp));
+                _running = false;
 
                 return _hashSize;
             }
@@ -106,12 +133,22 @@ namespace Internal.Cryptography
                     _ctx.Dispose();
                 }
             }
+
+            public override void Reset()
+            {
+                if (_running)
+                {
+                    Check(Interop.Crypto.EvpDigestReset(_ctx, _algorithmEvp));
+                    _running = false;
+                }
+            }
         }
 
         private sealed class HmacHashProvider : HashProvider
         {
             private readonly int _hashSize;
             private SafeHmacCtxHandle _hmacCtx;
+            private bool _running;
 
             public HmacHashProvider(IntPtr algorithmEvp, ReadOnlySpan<byte> key)
             {
@@ -127,8 +164,11 @@ namespace Internal.Cryptography
                 Interop.Crypto.CheckValidOpenSslHandle(_hmacCtx);
             }
 
-            public override void AppendHashData(ReadOnlySpan<byte> data) =>
+            public override void AppendHashData(ReadOnlySpan<byte> data)
+            {
+                _running = true;
                 Check(Interop.Crypto.HmacUpdate(_hmacCtx, data, data.Length));
+            }
 
             public override int FinalizeHashAndReset(Span<byte> destination)
             {
@@ -139,6 +179,7 @@ namespace Internal.Cryptography
                 Debug.Assert(length == _hashSize);
 
                 Check(Interop.Crypto.HmacReset(_hmacCtx));
+                _running = false;
                 return _hashSize;
             }
 
@@ -161,6 +202,15 @@ namespace Internal.Cryptography
                 {
                     _hmacCtx.Dispose();
                     _hmacCtx = null!;
+                }
+            }
+
+            public override void Reset()
+            {
+                if (_running)
+                {
+                    Check(Interop.Crypto.HmacReset(_hmacCtx));
+                    _running = false;
                 }
             }
         }

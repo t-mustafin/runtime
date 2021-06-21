@@ -12,40 +12,87 @@ namespace Internal.Cryptography
     {
         public static HashProvider CreateHashProvider(string hashAlgorithmId)
         {
-            switch (hashAlgorithmId)
-            {
-                case HashAlgorithmNames.MD5:
-                    return new AppleDigestProvider(Interop.AppleCrypto.PAL_HashAlgorithm.Md5);
-                case HashAlgorithmNames.SHA1:
-                    return new AppleDigestProvider(Interop.AppleCrypto.PAL_HashAlgorithm.Sha1);
-                case HashAlgorithmNames.SHA256:
-                    return new AppleDigestProvider(Interop.AppleCrypto.PAL_HashAlgorithm.Sha256);
-                case HashAlgorithmNames.SHA384:
-                    return new AppleDigestProvider(Interop.AppleCrypto.PAL_HashAlgorithm.Sha384);
-                case HashAlgorithmNames.SHA512:
-                    return new AppleDigestProvider(Interop.AppleCrypto.PAL_HashAlgorithm.Sha512);
-            }
-
-            throw new CryptographicException(SR.Format(SR.Cryptography_UnknownHashAlgorithm, hashAlgorithmId));
+            Interop.AppleCrypto.PAL_HashAlgorithm algorithm = HashAlgorithmToPal(hashAlgorithmId);
+            return new AppleDigestProvider(algorithm);
         }
 
         public static HashProvider CreateMacProvider(string hashAlgorithmId, ReadOnlySpan<byte> key)
         {
-            switch (hashAlgorithmId)
+            Interop.AppleCrypto.PAL_HashAlgorithm algorithm = HashAlgorithmToPal(hashAlgorithmId);
+            return new AppleHmacProvider(algorithm, key);
+        }
+
+        private static Interop.AppleCrypto.PAL_HashAlgorithm HashAlgorithmToPal(string hashAlgorithmId) => hashAlgorithmId switch {
+            HashAlgorithmNames.MD5 => Interop.AppleCrypto.PAL_HashAlgorithm.Md5,
+            HashAlgorithmNames.SHA1 => Interop.AppleCrypto.PAL_HashAlgorithm.Sha1,
+            HashAlgorithmNames.SHA256 => Interop.AppleCrypto.PAL_HashAlgorithm.Sha256,
+            HashAlgorithmNames.SHA384 => Interop.AppleCrypto.PAL_HashAlgorithm.Sha384,
+            HashAlgorithmNames.SHA512 => Interop.AppleCrypto.PAL_HashAlgorithm.Sha512,
+            _ => throw new CryptographicException(SR.Format(SR.Cryptography_UnknownHashAlgorithm, hashAlgorithmId))
+        };
+
+        internal static class OneShotHashProvider
+        {
+            public static unsafe int MacData(
+                string hashAlgorithmId,
+                ReadOnlySpan<byte> key,
+                ReadOnlySpan<byte> source,
+                Span<byte> destination)
             {
-                case HashAlgorithmNames.MD5:
-                    return new AppleHmacProvider(Interop.AppleCrypto.PAL_HashAlgorithm.Md5, key);
-                case HashAlgorithmNames.SHA1:
-                    return new AppleHmacProvider(Interop.AppleCrypto.PAL_HashAlgorithm.Sha1, key);
-                case HashAlgorithmNames.SHA256:
-                    return new AppleHmacProvider(Interop.AppleCrypto.PAL_HashAlgorithm.Sha256, key);
-                case HashAlgorithmNames.SHA384:
-                    return new AppleHmacProvider(Interop.AppleCrypto.PAL_HashAlgorithm.Sha384, key);
-                case HashAlgorithmNames.SHA512:
-                    return new AppleHmacProvider(Interop.AppleCrypto.PAL_HashAlgorithm.Sha512, key);
+                Interop.AppleCrypto.PAL_HashAlgorithm algorithm = HashAlgorithmToPal(hashAlgorithmId);
+
+                fixed (byte* pKey = key)
+                fixed (byte* pSource = source)
+                fixed (byte* pDestination = destination)
+                {
+                    int ret = Interop.AppleCrypto.HmacOneShot(
+                        algorithm,
+                        pKey,
+                        key.Length,
+                        pSource,
+                        source.Length,
+                        pDestination,
+                        destination.Length,
+                        out int digestSize);
+
+                    if (ret != 1)
+                    {
+                        Debug.Fail($"MacData return value {ret} was not 1");
+                        throw new CryptographicException();
+                    }
+
+                    Debug.Assert(digestSize <= destination.Length);
+
+                    return digestSize;
+                }
             }
 
-            throw new CryptographicException(SR.Format(SR.Cryptography_UnknownHashAlgorithm, hashAlgorithmId));
+            public static unsafe int HashData(string hashAlgorithmId, ReadOnlySpan<byte> source, Span<byte> destination)
+            {
+                Interop.AppleCrypto.PAL_HashAlgorithm algorithm = HashAlgorithmToPal(hashAlgorithmId);
+
+                fixed (byte* pSource = source)
+                fixed (byte* pDestination = destination)
+                {
+                    int ret = Interop.AppleCrypto.DigestOneShot(
+                        algorithm,
+                        pSource,
+                        source.Length,
+                        pDestination,
+                        destination.Length,
+                        out int digestSize);
+
+                    if (ret != 1)
+                    {
+                        Debug.Fail($"HashData return value {ret} was not 1");
+                        throw new CryptographicException();
+                    }
+
+                    Debug.Assert(digestSize <= destination.Length);
+
+                    return digestSize;
+                }
+            }
         }
 
         private sealed class AppleHmacProvider : HashProvider
@@ -144,14 +191,17 @@ namespace Internal.Cryptography
                 if (disposing)
                 {
                     _ctx?.Dispose();
-                    Array.Clear(_key, 0, _key.Length);
+                    Array.Clear(_key);
                 }
             }
+
+            public override void Reset() => _running = false;
         }
 
         private sealed class AppleDigestProvider : HashProvider
         {
             private readonly SafeDigestCtxHandle _ctx;
+            private bool _running;
 
             public override int HashSizeInBytes { get; }
 
@@ -180,6 +230,7 @@ namespace Internal.Cryptography
 
             public override void AppendHashData(ReadOnlySpan<byte> data)
             {
+                _running = true;
                 int ret = Interop.AppleCrypto.DigestUpdate(_ctx, data);
 
                 if (ret != 1)
@@ -194,6 +245,7 @@ namespace Internal.Cryptography
                 Debug.Assert(destination.Length >= HashSizeInBytes);
 
                 int ret = Interop.AppleCrypto.DigestFinal(_ctx, destination);
+                _running = false;
 
                 if (ret != 1)
                 {
@@ -217,6 +269,22 @@ namespace Internal.Cryptography
                 }
 
                 return HashSizeInBytes;
+            }
+
+            public override void Reset()
+            {
+                if (_running)
+                {
+                    int ret = Interop.AppleCrypto.DigestReset(_ctx);
+
+                    if (ret != 1)
+                    {
+                        Debug.Assert(ret == 0, $"DigestReset return value {ret} was not 0 or 1");
+                        throw new CryptographicException();
+                    }
+
+                    _running = false;
+                }
             }
 
             public override void Dispose(bool disposing)

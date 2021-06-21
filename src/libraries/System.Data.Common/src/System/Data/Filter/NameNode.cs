@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data
 {
@@ -10,14 +11,14 @@ namespace System.Data
     {
         internal string _name;
         internal bool _found;
-        internal DataColumn _column;
+        internal DataColumn? _column;
 
-        internal NameNode(DataTable table, char[] text, int start, int pos) : base(table)
+        internal NameNode(DataTable? table, char[] text, int start, int pos) : base(table)
         {
             _name = ParseName(text, start, pos);
         }
 
-        internal NameNode(DataTable table, string name) : base(table)
+        internal NameNode(DataTable? table, string name) : base(table)
         {
             _name = name;
         }
@@ -26,7 +27,7 @@ namespace System.Data
         {
             get
             {
-                return _column.IsSqlType;
+                return _column!.IsSqlType;
             }
         }
 
@@ -75,13 +76,15 @@ namespace System.Data
             }
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal override object Eval()
         {
             // can not eval column without ROW value;
             throw ExprException.EvalNoContext();
         }
 
-        internal override object Eval(DataRow row, DataRowVersion version)
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
+        internal override object Eval(DataRow? row, DataRowVersion version)
         {
             if (!_found)
             {
@@ -91,19 +94,20 @@ namespace System.Data
             if (row == null)
             {
                 if (IsTableConstant()) // this column is TableConstant Aggregate Function
-                    return _column.DataExpression.Evaluate();
+                    return _column!.DataExpression!.Evaluate();
                 else
                 {
                     throw ExprException.UnboundName(_name);
                 }
             }
 
-            return _column[row.GetRecordFromVersion(version)];
+            return _column![row.GetRecordFromVersion(version)];
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal override object Eval(int[] records)
         {
-            throw ExprException.ComputeNotAggregate(ToString());
+            throw ExprException.ComputeNotAggregate(ToString()!);
         }
 
         internal override bool IsConstant()
@@ -115,7 +119,7 @@ namespace System.Data
         {
             if (_column != null && _column.Computed)
             {
-                return _column.DataExpression.IsTableAggregate();
+                return _column.DataExpression!.IsTableAggregate();
             }
             return false;
         }
@@ -124,7 +128,7 @@ namespace System.Data
         {
             if (_column != null && _column.Computed)
             {
-                return _column.DataExpression.HasLocalAggregate();
+                return _column.DataExpression!.HasLocalAggregate();
             }
             return false;
         }
@@ -133,7 +137,7 @@ namespace System.Data
         {
             if (_column != null && _column.Computed)
             {
-                return _column.DataExpression.HasRemoteAggregate();
+                return _column.DataExpression!.HasRemoteAggregate();
             }
             return false;
         }
@@ -143,9 +147,9 @@ namespace System.Data
             if (_column == column)
                 return true;
 
-            if (_column.Computed)
+            if (_column!.Computed)
             {
-                return _column.DataExpression.DependsOn(column);
+                return _column.DataExpression!.DependsOn(column);
             }
 
             return false;

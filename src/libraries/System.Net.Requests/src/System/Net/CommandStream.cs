@@ -44,7 +44,7 @@ namespace System.Net
 
         internal virtual void Abort(Exception e)
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Info(this, "closing control Stream");
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, "closing control Stream");
 
             lock (this)
             {
@@ -72,7 +72,7 @@ namespace System.Net
 
         protected override void Dispose(bool disposing)
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Info(this);
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this);
 
             InvokeRequestCallback(null);
 
@@ -205,7 +205,7 @@ namespace System.Net
                             if (index != -1)
                                 sendCommand = string.Concat(sendCommand.AsSpan(0, index), " ********");
                         }
-                        if (NetEventSource.IsEnabled) NetEventSource.Info(this, $"Sending command {sendCommand}");
+                        if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, $"Sending command {sendCommand}");
                     }
 
                     try
@@ -373,7 +373,7 @@ namespace System.Net
             DontLogParameter = 0x8
         }
 
-        internal class PipelineEntry
+        internal sealed class PipelineEntry
         {
             internal PipelineEntry(string command)
             {
@@ -658,7 +658,7 @@ namespace System.Net
             state.Resp.StatusDescription = responseString.Substring(0, completeLength);
             // Set the StatusDescription to the complete part of the response.  Note that the Buffer has already been taken care of above.
 
-            if (NetEventSource.IsEnabled) NetEventSource.Info(this, $"Received response: {responseString.Substring(0, completeLength - 2)}");
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, $"Received response: {responseString.Substring(0, completeLength - 2)}");
 
             if (_isAsync)
             {
@@ -678,7 +678,7 @@ namespace System.Net
     /// <summary>
     /// Contains the parsed status line from the server
     /// </summary>
-    internal class ResponseDescription
+    internal sealed class ResponseDescription
     {
         internal const int NoStatus = -1;
         internal bool Multiline;
@@ -699,7 +699,7 @@ namespace System.Net
     /// <summary>
     /// State information that is used during ReceiveCommandResponse()'s async operations
     /// </summary>
-    internal class ReceiveState
+    internal sealed class ReceiveState
     {
         private const int bufferSize = 1024;
 

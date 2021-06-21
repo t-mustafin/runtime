@@ -22,15 +22,14 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <syslog.h>
 #include <termios.h>
 #include <unistd.h>
 #include <limits.h>
-#if HAVE_CLONEFILE
-#include <sys/attr.h>
-#include <sys/clonefile.h>
-#endif
-#if HAVE_SENDFILE_4
+#if HAVE_FCOPYFILE
+#include <copyfile.h>
+#elif HAVE_SENDFILE_4
 #include <sys/sendfile.h>
 #endif
 #if HAVE_INOTIFY
@@ -42,11 +41,15 @@
 // Somehow, AIX mangles the definition for this behind a C++ def
 // Redeclare it here
 extern int     getpeereid(int, uid_t *__restrict__, gid_t *__restrict__);
-// This function declaration is hidden behind `_XOPEN_SOURCE=700`, but we need
-// `_ALL_SOURCE` to build the runtime, and that resets that definition to 600.
-// Instead of trying to wrangle ifdefs in system headers with more definitions,
-// just declare it here.
-extern ssize_t  getline(char **, size_t *, FILE *);
+#elif defined(__sun)
+#ifndef _KERNEL
+#define _KERNEL
+#define UNDEF_KERNEL
+#endif
+#include <sys/procfs.h>
+#ifdef UNDEF_KERNEL
+#undef _KERNEL
+#endif
 #endif
 
 #if HAVE_STAT64
@@ -91,7 +94,10 @@ c_static_assert(PAL_S_IFSOCK == S_IFSOCK);
 // Validate that our enum for inode types is the same as what is
 // declared by the dirent.h header on the local system.
 // (AIX doesn't have dirent d_type, so none of this there)
-#if defined(DT_UNKNOWN)
+// WebAssembly (BROWSER) has dirent d_type but is not correct
+// by returning UNKNOWN the managed code properly stats the file
+// to detect if entry is directory or not.
+#if defined(DT_UNKNOWN) || defined(TARGET_WASM)
 c_static_assert((int)PAL_DT_UNKNOWN == (int)DT_UNKNOWN);
 c_static_assert((int)PAL_DT_FIFO == (int)DT_FIFO);
 c_static_assert((int)PAL_DT_CHR == (int)DT_CHR);
@@ -345,10 +351,13 @@ static void ConvertDirent(const struct dirent* entry, DirectoryEntry* outputEntr
     // the start of the unmanaged string. Give the caller back a pointer to the
     // location of the start of the string that exists in their own byte buffer.
     outputEntry->Name = entry->d_name;
-#if !defined(DT_UNKNOWN)
+#if !defined(DT_UNKNOWN) || defined(TARGET_WASM)
     // AIX has no d_type, and since we can't get the directory that goes with
     // the filename from ReadDir, we can't stat the file. Return unknown and
     // hope that managed code can properly stat the file.
+    // WebAssembly (BROWSER) has dirent d_type but is not correct
+    // by returning UNKNOWN the managed code properly stats the file
+    // to detect if entry is directory or not.
     outputEntry->InodeType = PAL_DT_UNKNOWN;
 #else
     outputEntry->InodeType = (int32_t)entry->d_type;
@@ -419,7 +428,10 @@ int32_t SystemNative_ReadDirR(DIR* dir, uint8_t* buffer, int32_t bufferSize, Dir
         return errno == 0 ? -1 : errno;
     }
 #else
-    int error = readdir_r(dir, entry, &result);
+    int error;
+
+    // EINTR isn't documented, happens in practice on macOS.
+    while ((error = readdir_r(dir, entry, &result)) && errno == EINTR);
 
     // positive error number returned -> failure
     if (error != 0)
@@ -465,12 +477,27 @@ int32_t SystemNative_ReadDirR(DIR* dir, uint8_t* buffer, int32_t bufferSize, Dir
 
 DIR* SystemNative_OpenDir(const char* path)
 {
-    return opendir(path);
+    DIR *result;
+
+    // EINTR isn't documented, happens in practice on macOS.
+    while ((result = opendir(path)) == NULL && errno == EINTR);
+
+    return result;
 }
 
 int32_t SystemNative_CloseDir(DIR* dir)
 {
-    return closedir(dir);
+    int32_t result;
+
+    result = closedir(dir);
+
+    // EINTR isn't documented, happens in practice on macOS.
+    if (result < 0 && errno == EINTR)
+    {
+        result = 0;
+    }
+
+    return result;
 }
 
 int32_t SystemNative_Pipe(int32_t pipeFds[2], int32_t flags)
@@ -633,8 +660,16 @@ int32_t SystemNative_FChMod(intptr_t fd, int32_t mode)
 
 int32_t SystemNative_FSync(intptr_t fd)
 {
+    int fileDescriptor = ToFileDescriptor(fd);
+
     int32_t result;
-    while ((result = fsync(ToFileDescriptor(fd))) < 0 && errno == EINTR);
+    while ((result =
+#if defined(TARGET_OSX) && HAVE_F_FULLFSYNC
+    fcntl(fileDescriptor, F_FULLFSYNC)
+#else
+    fsync(fileDescriptor)
+#endif
+    < 0) && errno == EINTR);
     return result;
 }
 
@@ -957,15 +992,83 @@ int32_t SystemNative_PosixFAdvise(intptr_t fd, int64_t offset, int64_t length, i
 #endif
 }
 
-char* SystemNative_GetLine(FILE* stream)
+int32_t SystemNative_PosixFAllocate(intptr_t fd, int64_t offset, int64_t length)
 {
-    assert(stream != NULL);
+    assert_msg(offset == 0, "Invalid offset value", (int)offset);
 
-    char* lineptr = NULL;
-    size_t n = 0;
-    ssize_t length = getline(&lineptr, &n, stream);
+    int fileDescriptor = ToFileDescriptor(fd);
+    int32_t result;
+#if HAVE_POSIX_FALLOCATE64 // 64-bit Linux
+    while ((result = posix_fallocate64(fileDescriptor, (off64_t)offset, (off64_t)length)) == EINTR);
+#elif HAVE_POSIX_FALLOCATE // 32-bit Linux
+    while ((result = posix_fallocate(fileDescriptor, (off_t)offset, (off_t)length)) == EINTR);
+#elif defined(F_PREALLOCATE) // macOS
+    fstore_t fstore;
+    fstore.fst_flags = F_ALLOCATECONTIG; // ensure contiguous space
+    fstore.fst_posmode = F_PEOFPOSMODE;  // allocate from the physical end of file, as offset MUST NOT be 0 for F_VOLPOSMODE
+    fstore.fst_offset = (off_t)offset;
+    fstore.fst_length = (off_t)length;
+    fstore.fst_bytesalloc = 0; // output size, can be > length
 
-    return length >= 0 ? lineptr : NULL;
+    while ((result = fcntl(fileDescriptor, F_PREALLOCATE, &fstore)) == -1 && errno == EINTR);
+
+    if (result == -1)
+    {
+        // we have failed to allocate contiguous space, let's try non-contiguous
+        fstore.fst_flags = F_ALLOCATEALL; // all or nothing
+        while ((result = fcntl(fileDescriptor, F_PREALLOCATE, &fstore)) == -1 && errno == EINTR);
+    }
+#elif defined(F_ALLOCSP) || defined(F_ALLOCSP64) // FreeBSD
+    #if HAVE_FLOCK64
+    struct flock64 lockArgs;
+    int command = F_ALLOCSP64;
+    #else
+    struct flock lockArgs;
+    int command = F_ALLOCSP;
+    #endif
+
+    lockArgs.l_whence = SEEK_SET;
+    lockArgs.l_start = (off_t)offset;
+    lockArgs.l_len = (off_t)length;
+
+    while ((result = fcntl(fileDescriptor, command, &lockArgs)) == -1 && errno == EINTR);
+#endif
+
+#if defined(F_PREALLOCATE) || defined(F_ALLOCSP) || defined(F_ALLOCSP64)
+    // most of the Unixes implement posix_fallocate which does NOT set the last error
+    // fctnl does, but to mimic the posix_fallocate behaviour we just return error
+    if (result == -1)
+    {
+        result = errno;
+    }
+    else
+    {
+        // align the behaviour with what posix_fallocate does (change reported file size)
+        ftruncate(fileDescriptor, length);
+    }
+#endif
+
+    // error codes can be OS-specific, so this is why this handling is done here rather than in the managed layer
+    switch (result)
+    {
+        case ENOSPC: // there was not enough space
+            return -1;
+        case EFBIG: // the file was too large
+            return -2;
+        case ENODEV: // not a regular file
+        case ESPIPE: // a pipe
+            // We ignore it, as FileStream contract makes it clear that allocationSize is ignored for non-regular files.
+            return 0;
+        case EINVAL:
+            // We control the offset and length so they are correct.
+            assert_msg(length >= 0, "Invalid length value", (int)length);
+            // But if the underlying filesystem does not support the operation, we just ignore it and treat as a hint.
+            return 0;
+        default:
+            assert(result != EINTR); // it can't happen here as we retry the call on EINTR
+            assert(result != EBADF); // it can't happen here as this method is being called after a succesfull call to open (with write permissions) before returning the SafeFileHandle to the user
+            return 0;
+    }
 }
 
 int32_t SystemNative_Read(intptr_t fd, void* buffer, int32_t bufferSize)
@@ -1014,6 +1117,7 @@ int32_t SystemNative_Write(intptr_t fd, const void* buffer, int32_t bufferSize)
     return Common_Write(fd, buffer, bufferSize);
 }
 
+#if !HAVE_FCOPYFILE
 // Read all data from inFd and write it to outFd
 static int32_t CopyFile_ReadWrite(int inFd, int outFd)
 {
@@ -1066,90 +1170,32 @@ static int32_t CopyFile_ReadWrite(int inFd, int outFd)
     free(buffer);
     return 0;
 }
+#endif // !HAVE_FCOPYFILE
 
-int32_t SystemNative_CopyFile(intptr_t sourceFd, const char* srcPath, const char* destPath, int32_t overwrite)
+int32_t SystemNative_CopyFile(intptr_t sourceFd, intptr_t destinationFd)
 {
     int inFd = ToFileDescriptor(sourceFd);
-    int outFd;
-    int ret;
-    int tmpErrno;
-    int openFlags;
-    struct stat_ sourceStat;
+    int outFd = ToFileDescriptor(destinationFd);
 
+#if HAVE_FCOPYFILE
+    // If fcopyfile is available (OS X), try to use it, as the whole copy
+    // can be performed in the kernel, without lots of unnecessary copying.
+    // Copy data and metadata.
+    return fcopyfile(inFd, outFd, NULL, COPYFILE_ALL) == 0 ? 0 : -1;
+#else
+    // Get the stats on the source file.
+    int ret;
+    struct stat_ sourceStat;
+    bool copied = false;
+#if HAVE_SENDFILE_4
+    // If sendfile is available (Linux), try to use it, as the whole copy
+    // can be performed in the kernel, without lots of unnecessary copying.
     while ((ret = fstat_(inFd, &sourceStat)) < 0 && errno == EINTR);
     if (ret != 0)
     {
         return -1;
     }
 
-    struct stat_ destStat;
-    while ((ret = stat_(destPath, &destStat)) < 0 && errno == EINTR);
-    if (ret == 0)
-    {
-        if (!overwrite)
-        {
-            errno = EEXIST;
-            return -1;
-        }
-
-        if (sourceStat.st_dev == destStat.st_dev && sourceStat.st_ino == destStat.st_ino)
-        {
-            // Attempt to copy file over itself. Fail with the same error code as
-            // open would.
-            errno = EBUSY;
-            return -1;
-        }
-
-#if HAVE_CLONEFILE
-        // For clonefile we need to unlink the destination file first but we need to
-        // check permission first to ensure we don't try to unlink read-only file.
-        if (access(destPath, W_OK) != 0)
-        {
-            return -1;
-        }
-
-        ret = unlink(destPath);
-        if (ret != 0)
-        {
-            return ret;
-        }
-#endif
-    }
-
-#if HAVE_CLONEFILE
-    while ((ret = clonefile(srcPath, destPath, 0)) < 0 && errno == EINTR);
-    // EEXIST can happen due to race condition between the stat/unlink above
-    // and the clonefile here. The file could be (re-)created from another
-    // thread or process before we have a chance to call clonefile. Handle
-    // it by falling back to the slow path.
-    if (ret == 0 || (errno != ENOTSUP && errno != EXDEV && errno != EEXIST))
-    {
-        return ret;
-    }
-#else
-    // Unused variable
-    (void)srcPath;
-#endif
-
-    openFlags = O_WRONLY | O_TRUNC | O_CREAT | (overwrite ? 0 : O_EXCL);
-#if HAVE_O_CLOEXEC
-    openFlags |= O_CLOEXEC;
-#endif
-    while ((outFd = open(destPath, openFlags, sourceStat.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO))) < 0 && errno == EINTR);
-    if (outFd < 0)
-    {
-        return -1;
-    }
-#if !HAVE_O_CLOEXEC
-    fcntl(outFd, F_SETFD, FD_CLOEXEC);
-#endif
-
-    // Get the stats on the source file.
-    bool copied = false;
-
-    // If sendfile is available (Linux), try to use it, as the whole copy
-    // can be performed in the kernel, without lots of unnecessary copying.
-#if HAVE_SENDFILE_4
 
     // On 32-bit, if you use 64-bit offsets, the last argument of `sendfile' will be a
     // `size_t' a 32-bit integer while the `st_size' field of the stat structure will be off64_t.
@@ -1165,9 +1211,6 @@ int32_t SystemNative_CopyFile(intptr_t sourceFd, const char* srcPath, const char
         {
             if (errno != EINVAL && errno != ENOSYS)
             {
-                tmpErrno = errno;
-                close(outFd);
-                errno = tmpErrno;
                 return -1;
             }
             else
@@ -1193,9 +1236,6 @@ int32_t SystemNative_CopyFile(intptr_t sourceFd, const char* srcPath, const char
     // Manually read all data from the source and write it to the destination.
     if (!copied && CopyFile_ReadWrite(inFd, outFd) != 0)
     {
-        tmpErrno = errno;
-        close(outFd);
-        errno = tmpErrno;
         return -1;
     }
 
@@ -1203,27 +1243,43 @@ int32_t SystemNative_CopyFile(intptr_t sourceFd, const char* srcPath, const char
     // from the source file.  First copy the file times.
     // If futimes nor futimes are available on this platform, file times will
     // not be copied over.
+    while ((ret = fstat_(inFd, &sourceStat)) < 0 && errno == EINTR);
+    if (ret == 0)
+    {
 #if HAVE_FUTIMENS
-    // futimens is prefered because it has a higher resolution.
-    struct timespec origTimes[2];
-    origTimes[0].tv_sec = (time_t)sourceStat.st_atime;
-    origTimes[0].tv_nsec = ST_ATIME_NSEC(&sourceStat);
-    origTimes[1].tv_sec = (time_t)sourceStat.st_mtime;
-    origTimes[1].tv_nsec = ST_MTIME_NSEC(&sourceStat);
-    while ((ret = futimens(outFd, origTimes)) < 0 && errno == EINTR);
+        // futimens is prefered because it has a higher resolution.
+        struct timespec origTimes[2];
+        origTimes[0].tv_sec = (time_t)sourceStat.st_atime;
+        origTimes[0].tv_nsec = ST_ATIME_NSEC(&sourceStat);
+        origTimes[1].tv_sec = (time_t)sourceStat.st_mtime;
+        origTimes[1].tv_nsec = ST_MTIME_NSEC(&sourceStat);
+        while ((ret = futimens(outFd, origTimes)) < 0 && errno == EINTR);
 #elif HAVE_FUTIMES
-    struct timeval origTimes[2];
-    origTimes[0].tv_sec = sourceStat.st_atime;
-    origTimes[0].tv_usec = (int32_t)(ST_ATIME_NSEC(&sourceStat) / 1000);
-    origTimes[1].tv_sec = sourceStat.st_mtime;
-    origTimes[1].tv_usec = (int32_t)(ST_MTIME_NSEC(&sourceStat) / 1000);
-    while ((ret = futimes(outFd, origTimes)) < 0 && errno == EINTR);
+        struct timeval origTimes[2];
+        origTimes[0].tv_sec = sourceStat.st_atime;
+        origTimes[0].tv_usec = (int32_t)(ST_ATIME_NSEC(&sourceStat) / 1000);
+        origTimes[1].tv_sec = sourceStat.st_mtime;
+        origTimes[1].tv_usec = (int32_t)(ST_MTIME_NSEC(&sourceStat) / 1000);
+        while ((ret = futimes(outFd, origTimes)) < 0 && errno == EINTR);
 #endif
+    }
+    // If we copied to a filesystem (eg EXFAT) that does not preserve POSIX ownership, all files appear
+    // to be owned by root. If we aren't running as root, then we won't be an owner of our new file, and
+    // attempting to copy metadata to it will fail with EPERM. We have copied successfully, we just can't
+    // copy metadata. The best thing we can do is skip copying the metadata.
+    if (ret != 0 && errno != EPERM)
+    {
+        return -1;
+    }
+    // Then copy permissions.
+    while ((ret = fchmod(outFd, sourceStat.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO))) < 0 && errno == EINTR);
+    if (ret != 0 && errno != EPERM) // See EPERM comment above
+    {
+        return -1;
+    }
 
-    tmpErrno = errno;
-    close(outFd);
-    errno = tmpErrno;
     return 0;
+#endif // HAVE_FCOPYFILE
 }
 
 intptr_t SystemNative_INotifyInit(void)
@@ -1305,8 +1361,27 @@ char* SystemNative_RealPath(const char* path)
     return realpath(path, NULL);
 }
 
+static int16_t ConvertLockType(int16_t managedLockType)
+{
+    // the managed enum Interop.Sys.LockType has no 1:1 mapping with corresponding Unix values
+    // which can be different per distro:
+    // https://github.com/torvalds/linux/blob/fcadab740480e0e0e9fa9bd272acd409884d431a/arch/alpha/include/uapi/asm/fcntl.h#L48-L50
+    // https://github.com/freebsd/freebsd-src/blob/fb8c2f743ab695f6004650b58bf96972e2535b20/sys/sys/fcntl.h#L277-L279
+    switch (managedLockType)
+    {
+        case 0:
+            return F_RDLCK;
+        case 1:
+            return F_WRLCK;
+        default:
+            assert_msg(managedLockType == 2, "Unknown Lock Type", (int)managedLockType);
+            return F_UNLCK;
+    }
+}
+
 int32_t SystemNative_LockFileRegion(intptr_t fd, int64_t offset, int64_t length, int16_t lockType)
 {
+    int16_t unixLockType = ConvertLockType(lockType);
     if (offset < 0 || length < 0)
     {
         errno = EINVAL;
@@ -1319,7 +1394,7 @@ int32_t SystemNative_LockFileRegion(intptr_t fd, int64_t offset, int64_t length,
     struct flock lockArgs;
 #endif
 
-    lockArgs.l_type = lockType;
+    lockArgs.l_type = unixLockType;
     lockArgs.l_whence = SEEK_SET;
     lockArgs.l_start = (off_t)offset;
     lockArgs.l_len = (off_t)length;
@@ -1349,4 +1424,138 @@ int32_t SystemNative_LChflagsCanSetHiddenFlag(void)
 #else
     return false;
 #endif
+}
+
+int32_t SystemNative_ReadProcessStatusInfo(pid_t pid, ProcessStatus* processStatus)
+{
+#ifdef __sun
+    char statusFilename[64];
+    snprintf(statusFilename, sizeof(statusFilename), "/proc/%d/psinfo", pid);
+
+    intptr_t fd;
+    while ((fd = open(statusFilename, O_RDONLY)) < 0 && errno == EINTR);
+    if (fd < 0)
+    {
+        return 0;
+    }
+
+    psinfo_t status;
+    int result = Common_Read(fd, &status, sizeof(psinfo_t));
+    close(fd);
+    if (result >= 0)
+    {
+        processStatus->ResidentSetSize = status.pr_rssize * 1024; // pr_rssize is in Kbytes
+        return 1;
+    }
+
+    return 0;
+#else
+    (void)pid, (void)processStatus;
+    errno = ENOTSUP;
+    return -1;
+#endif // __sun
+}
+
+int32_t SystemNative_PRead(intptr_t fd, void* buffer, int32_t bufferSize, int64_t fileOffset)
+{
+    assert(buffer != NULL);
+    assert(bufferSize >= 0);
+
+    ssize_t count;
+    while ((count = pread(ToFileDescriptor(fd), buffer, (uint32_t)bufferSize, (off_t)fileOffset)) < 0 && errno == EINTR);
+
+    assert(count >= -1 && count <= bufferSize);
+    return (int32_t)count;
+}
+
+int32_t SystemNative_PWrite(intptr_t fd, void* buffer, int32_t bufferSize, int64_t fileOffset)
+{
+    assert(buffer != NULL);
+    assert(bufferSize >= 0);
+
+    ssize_t count;
+    while ((count = pwrite(ToFileDescriptor(fd), buffer, (uint32_t)bufferSize, (off_t)fileOffset)) < 0 && errno == EINTR);
+
+    assert(count >= -1 && count <= bufferSize);
+    return (int32_t)count;
+}
+
+int64_t SystemNative_PReadV(intptr_t fd, IOVector* vectors, int32_t vectorCount, int64_t fileOffset)
+{
+    assert(vectors != NULL);
+    assert(vectorCount >= 0);
+
+    int64_t count = 0;
+    int fileDescriptor = ToFileDescriptor(fd);
+#if HAVE_PREADV && !defined(TARGET_WASM) // preadv is buggy on WASM
+    while ((count = preadv(fileDescriptor, (struct iovec*)vectors, (int)vectorCount, (off_t)fileOffset)) < 0 && errno == EINTR);
+#else
+    int64_t current;
+    for (int i = 0; i < vectorCount; i++)
+    {
+        IOVector vector = vectors[i];
+        while ((current = pread(fileDescriptor, vector.Base, vector.Count, (off_t)(fileOffset + count))) < 0 && errno == EINTR);
+
+        if (current < 0)
+        {
+            // if previous calls were succesfull, we return what we got so far
+            // otherwise, we return the error code
+            return count > 0 ? count : current;
+        }
+
+        count += current;
+
+        // Incomplete pread operation may happen for two reasons:
+        // a) We have reached EOF.
+        // b) The operation was interrupted by a signal handler.
+        // To mimic preadv, we stop on the first incomplete operation.
+        if (current != (int64_t)vector.Count)
+        {
+            return count;
+        }
+    }
+#endif
+
+    assert(count >= -1);
+    return count;
+}
+
+int64_t SystemNative_PWriteV(intptr_t fd, IOVector* vectors, int32_t vectorCount, int64_t fileOffset)
+{
+    assert(vectors != NULL);
+    assert(vectorCount >= 0);
+
+    int64_t count = 0;
+    int fileDescriptor = ToFileDescriptor(fd);
+#if HAVE_PWRITEV && !defined(TARGET_WASM) // pwritev is buggy on WASM
+    while ((count = pwritev(fileDescriptor, (struct iovec*)vectors, (int)vectorCount, (off_t)fileOffset)) < 0 && errno == EINTR);
+#else
+    int64_t current;
+    for (int i = 0; i < vectorCount; i++)
+    {
+        IOVector vector = vectors[i];
+        while ((current = pwrite(fileDescriptor, vector.Base, vector.Count, (off_t)(fileOffset + count))) < 0 && errno == EINTR);
+
+        if (current < 0)
+        {
+            // if previous calls were succesfull, we return what we got so far
+            // otherwise, we return the error code
+            return count > 0 ? count : current;
+        }
+
+        count += current;
+
+        // Incomplete pwrite operation may happen for few reasons:
+        // a) There was not enough space available or the file is too large for given file system.
+        // b) The operation was interrupted by a signal handler.
+        // To mimic pwritev, we stop on the first incomplete operation.
+        if (current != (int64_t)vector.Count)
+        {
+            return count;
+        }
+    }
+#endif
+
+    assert(count >= -1);
+    return count;
 }

@@ -11,9 +11,6 @@ namespace System.IO.Compression
     // The disposable fields that this class owns get disposed when the ZipArchive it belongs to gets disposed
     public partial class ZipArchiveEntry
     {
-        // The maximum index of our buffers, from the maximum index of a byte array
-        private const int MaxSingleBufferSize = 0x7FFFFFC7;
-
         private ZipArchive _archive;
         private readonly bool _originallyInArchive;
         private readonly int _diskNumberStart;
@@ -569,6 +566,7 @@ namespace System.IO.Compression
             if (!_everOpenedForWrite && _originallyInArchive)
             {
                 // we know that it is openable at this point
+                int MaxSingleBufferSize = Array.MaxLength;
 
                 _compressedBytes = new byte[(_compressedSize / MaxSingleBufferSize) + 1][];
                 for (int i = 0; i < _compressedBytes.Length - 1; i++)
@@ -1184,15 +1182,7 @@ namespace System.IO.Compression
             // they must set _everWritten, etc.
             public override void Write(byte[] buffer, int offset, int count)
             {
-                //we can't pass the argument checking down a level
-                if (buffer == null)
-                    throw new ArgumentNullException(nameof(buffer));
-                if (offset < 0)
-                    throw new ArgumentOutOfRangeException(nameof(offset), SR.ArgumentNeedNonNegative);
-                if (count < 0)
-                    throw new ArgumentOutOfRangeException(nameof(count), SR.ArgumentNeedNonNegative);
-                if ((buffer.Length - offset) < count)
-                    throw new ArgumentException(SR.OffsetLengthInvalid);
+                ValidateBufferArguments(buffer, offset, count);
 
                 ThrowIfDisposed();
                 Debug.Assert(CanWrite);

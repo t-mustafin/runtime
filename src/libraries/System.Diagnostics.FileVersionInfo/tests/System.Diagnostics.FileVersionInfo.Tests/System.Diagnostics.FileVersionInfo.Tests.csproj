@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>$(NetCoreAppCurrent)-Windows_NT;$(NetCoreAppCurrent)-Unix</TargetFrameworks>
+    <TargetFrameworks>$(NetCoreAppCurrent)-windows;$(NetCoreAppCurrent)-Unix;$(NetCoreAppCurrent)-Browser</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IgnoreForCI Condition="'$(TargetOS)' == 'Browser'">true</IgnoreForCI>
   </PropertyGroup>
   <ItemGroup>
     <!-- Checked in test binaries for FileVersionInfoTest -->
@@ -18,8 +19,14 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <ItemGroup Condition="'$(RunAOTCompilation)' == 'true'">
+    <!-- Identifies native libraries that should be skipped during AOT -->
+    <NativeLibraries Include="NativeLibrary.dll" />
+    <NativeLibraries Include="SecondNativeLibrary.dll" />
+  </ItemGroup>
   <ItemGroup>
     <Compile Include="FileVersionInfoTest.cs" />
+    <Compile Include="AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetsWindows)' == 'true'">
     <Compile Include="FileVersionInfoTest.Windows.cs" />
@@ -28,7 +35,7 @@
     <Compile Include="$(CommonPath)Interop\Windows\Kernel32\Interop.VerLanguageName.cs"
              Link="ProductionCode\Common\Interop\Windows\Kernel32\Interop.VerLanguageName.cs" />
   </ItemGroup>
-  <ItemGroup Condition="'$(TargetsUnix)' == 'true'">
+  <ItemGroup Condition="'$(TargetsUnix)' == 'true' or '$(TargetsBrowser)' == 'true'">
     <Compile Include="FileVersionInfoTest.Unix.cs" />
   </ItemGroup>
   <ItemGroup>

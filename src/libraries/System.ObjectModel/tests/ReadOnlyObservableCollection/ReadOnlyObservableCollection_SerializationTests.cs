@@ -17,8 +17,9 @@ namespace System.Collections.ObjectModel.Tests
             yield return new object[] { new ReadOnlyObservableCollection<int>(new ObservableCollection<int>() { 1, 2, 3 }) };
         }
 
-        [Theory]
+        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsBinaryFormatterSupported))]
         [MemberData(nameof(SerializeDeserialize_Roundtrips_MemberData))]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50933", TestPlatforms.Android)]
         public void SerializeDeserialize_Roundtrips(ReadOnlyObservableCollection<int> c)
         {
             ReadOnlyObservableCollection<int> clone = BinaryFormatterHelpers.Clone(c);

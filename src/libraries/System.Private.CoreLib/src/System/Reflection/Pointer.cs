@@ -3,6 +3,7 @@
 
 using System.Diagnostics;
 using System.Runtime.Serialization;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Reflection
 {
@@ -38,6 +39,18 @@ namespace System.Reflection
                 throw new ArgumentException(SR.Arg_MustBePointer, nameof(ptr));
             return ((Pointer)ptr)._ptr;
         }
+
+        public override unsafe bool Equals([NotNullWhen(true)] object? obj)
+        {
+            if (obj is Pointer pointer)
+            {
+                return _ptr == pointer._ptr;
+            }
+
+            return false;
+        }
+
+        public override unsafe int GetHashCode() => ((nuint)_ptr).GetHashCode();
 
         void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
         {

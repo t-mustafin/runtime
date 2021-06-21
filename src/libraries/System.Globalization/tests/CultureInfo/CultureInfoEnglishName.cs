@@ -11,12 +11,23 @@ namespace System.Globalization.Tests
         public static IEnumerable<object[]> EnglishName_TestData()
         {
             yield return new object[] { CultureInfo.CurrentCulture.Name, CultureInfo.CurrentCulture.EnglishName };
-            yield return new object[] { "en-US", "English (United States)" };
-            yield return new object[] { "fr-FR", "French (France)" };
+
+            if (PlatformDetection.IsNotUsingLimitedCultures)
+            {
+                yield return new object[] { "en-US", "English (United States)" };
+                yield return new object[] { "fr-FR", "French (France)" };
+            }
+            else
+            {
+                // Mobile / Browser ICU doesn't contain CultureInfo.EnglishName
+                yield return new object[] { "en-US", "en (US)" };
+                yield return new object[] { "fr-FR", "fr (FR)" };
+            }
         }
 
         [Theory]
         [MemberData(nameof(EnglishName_TestData))]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/36672", TestPlatforms.Android)]
         public void EnglishName(string name, string expected)
         {
             CultureInfo myTestCulture = new CultureInfo(name);

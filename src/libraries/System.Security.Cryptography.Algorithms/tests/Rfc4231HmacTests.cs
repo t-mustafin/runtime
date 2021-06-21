@@ -2,9 +2,11 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Test.Cryptography;
+using Xunit;
 
 namespace System.Security.Cryptography.Hashing.Algorithms.Tests
 {
+    [SkipOnPlatform(TestPlatforms.Browser, "Not supported on Browser")]
     public abstract class Rfc4231HmacTests : HmacTests
     {
         private static readonly byte[][] s_testKeys4231 =
@@ -31,8 +33,8 @@ namespace System.Security.Cryptography.Hashing.Algorithms.Tests
             ByteUtils.AsciiBytes("This is a test using a larger than block-size key and a larger than block-size data. The key needs to be hashed before being used by the HMAC algorithm."),
         };
 
-        protected Rfc4231HmacTests() :
-            base(s_testKeys4231, s_testData4231)
+        protected Rfc4231HmacTests(byte[][] testMacs) :
+            base(s_testKeys4231, s_testData4231, testMacs)
         {
         }
     }

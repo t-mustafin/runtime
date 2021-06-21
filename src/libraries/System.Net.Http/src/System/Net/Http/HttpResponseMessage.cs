@@ -48,7 +48,7 @@ namespace System.Net.Http
             {
                 CheckDisposed();
 
-                if (NetEventSource.IsEnabled)
+                if (NetEventSource.Log.IsEnabled())
                 {
                     if (value == null)
                     {
@@ -137,7 +137,8 @@ namespace System.Net.Http
             set
             {
                 CheckDisposed();
-                if (value != null) NetEventSource.Associate(this, value);
+                if (value is not null && NetEventSource.Log.IsEnabled())
+                    NetEventSource.Associate(this, value);
                 _requestMessage = value;
             }
         }
@@ -154,8 +155,6 @@ namespace System.Net.Http
 
         public HttpResponseMessage(HttpStatusCode statusCode)
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Enter(this, statusCode);
-
             if (((int)statusCode < 0) || ((int)statusCode > 999))
             {
                 throw new ArgumentOutOfRangeException(nameof(statusCode));
@@ -163,8 +162,6 @@ namespace System.Net.Http
 
             _statusCode = statusCode;
             _version = HttpUtilities.DefaultResponseVersion;
-
-            if (NetEventSource.IsEnabled) NetEventSource.Exit(this);
         }
 
         public HttpResponseMessage EnsureSuccessStatusCode()

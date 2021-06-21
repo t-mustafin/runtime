@@ -1,7 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-#nullable enable
+using System.Diagnostics;
 using System.Threading;
 
 namespace System.Net
@@ -18,7 +18,7 @@ namespace System.Net
     //
     // For now the state is not included as part of the closure.  It is too common a pattern (for example with socket receive)
     // to have several pending IOs differentiated by their state object.  We don't want that pattern to break the cache.
-    internal class CallbackClosure
+    internal sealed class CallbackClosure
     {
         private readonly AsyncCallback? _savedCallback;
         private readonly ExecutionContext? _savedContext;
@@ -130,11 +130,7 @@ namespace System.Net
             {
                 if (InternalPeekCompleted)
                 {
-                    if ((_flags & StateFlags.ThreadSafeContextCopy) == 0)
-                    {
-                        NetEventSource.Fail(this, "Called on completed result.");
-                    }
-
+                    Debug.Assert((_flags & StateFlags.ThreadSafeContextCopy) != 0, "Called on completed result.");
                     throw new InvalidOperationException(SR.net_completed_result);
                 }
 
@@ -145,29 +141,19 @@ namespace System.Net
                 }
 
                 // Make sure the context was requested.
-                if (AsyncCallback == null && (_flags & StateFlags.CaptureContext) == 0)
-                {
-                    NetEventSource.Fail(this, "No context captured - specify a callback or forceCaptureContext.");
-                }
+                Debug.Assert(AsyncCallback != null || (_flags & StateFlags.CaptureContext) != 0, "No context captured - specify a callback or forceCaptureContext.");
 
                 // Just use the lock to block.  We might be on the thread that owns the lock which is great, it means we
                 // don't need a context anyway.
                 if ((_flags & StateFlags.PostBlockFinished) == 0)
                 {
-                    if (_lock == null)
-                    {
-                        NetEventSource.Fail(this, "Must lock (StartPostingAsyncOp()) { ... FinishPostingAsyncOp(); } when calling ContextCopy (unless it's only called after FinishPostingAsyncOp).");
-                    }
+                    Debug.Assert(_lock != null, "Must lock (StartPostingAsyncOp()) { ... FinishPostingAsyncOp(); } when calling ContextCopy (unless it's only called after FinishPostingAsyncOp).");
                     lock (_lock) { }
                 }
 
                 if (InternalPeekCompleted)
                 {
-                    if ((_flags & StateFlags.ThreadSafeContextCopy) == 0)
-                    {
-                        NetEventSource.Fail(this, "Result became completed during call.");
-                    }
-
+                    Debug.Assert((_flags & StateFlags.ThreadSafeContextCopy) != 0, "Result became completed during call.");
                     throw new InvalidOperationException(SR.net_completed_result);
                 }
 
@@ -197,11 +183,7 @@ namespace System.Net
         // object from being created.
         internal object? StartPostingAsyncOp(bool lockCapture)
         {
-            if (InternalPeekCompleted)
-            {
-                NetEventSource.Fail(this, "Called on completed result.");
-            }
-
+            Debug.Assert(!InternalPeekCompleted, "Called on completed result.");
             DebugProtectState(true);
 
             _lock = lockCapture ? new object() : null;
@@ -274,7 +256,7 @@ namespace System.Net
         protected override void Cleanup()
         {
             base.Cleanup();
-            if (NetEventSource.IsEnabled) NetEventSource.Info(this);
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this);
             CleanupInternal();
         }
 
@@ -285,10 +267,7 @@ namespace System.Net
         // Returns whether the operation completed sync or not.
         private bool CaptureOrComplete(ref ExecutionContext? cachedContext, bool returnContext)
         {
-            if ((_flags & StateFlags.PostBlockStarted) == 0)
-            {
-                NetEventSource.Fail(this, "Called without calling StartPostingAsyncOp.");
-            }
+            Debug.Assert((_flags & StateFlags.PostBlockStarted) != 0, "Called without calling StartPostingAsyncOp.");
 
             // See if we're going to need to capture the context.
             bool capturingContext = AsyncCallback != null || (_flags & StateFlags.CaptureContext) != 0;
@@ -298,7 +277,7 @@ namespace System.Net
             // capturing the context won't be sufficient.
             if ((_flags & StateFlags.CaptureIdentity) != 0 && !InternalPeekCompleted && (!capturingContext))
             {
-                if (NetEventSource.IsEnabled) NetEventSource.Info(this, "starting identity capture");
+                if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, "starting identity capture");
                 SafeCaptureIdentity();
             }
 
@@ -306,7 +285,7 @@ namespace System.Net
             // Note that Capture() can return null, for example if SuppressFlow() is in effect.
             if (capturingContext && !InternalPeekCompleted)
             {
-                if (NetEventSource.IsEnabled) NetEventSource.Info(this, "starting capture");
+                if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, "starting capture");
 
                 if (cachedContext == null)
                 {
@@ -326,18 +305,15 @@ namespace System.Net
                     }
                 }
 
-                if (NetEventSource.IsEnabled) NetEventSource.Info(this, $"_context:{_context}");
+                if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, $"_context:{_context}");
             }
             else
             {
                 // Otherwise we have to have completed synchronously, or not needed the context.
-                if (NetEventSource.IsEnabled) NetEventSource.Info(this, "Skipping capture");
+                if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, "Skipping capture");
 
                 cachedContext = null;
-                if (AsyncCallback != null && !CompletedSynchronously)
-                {
-                    NetEventSource.Fail(this, "Didn't capture context, but didn't complete synchronously!");
-                }
+                Debug.Assert(AsyncCallback == null || CompletedSynchronously, "Didn't capture context, but didn't complete synchronously!");
             }
 
             // Now we want to see for sure what to do.  We might have just captured the context for no reason.
@@ -347,7 +323,7 @@ namespace System.Net
             DebugProtectState(false);
             if (CompletedSynchronously)
             {
-                if (NetEventSource.IsEnabled) NetEventSource.Info(this, "Completing synchronously");
+                if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, "Completing synchronously");
                 base.Complete(IntPtr.Zero);
                 return true;
             }
@@ -358,7 +334,7 @@ namespace System.Net
         // This method is guaranteed to be called only once.  If called with a non-zero userToken, the context is not flowed.
         protected override void Complete(IntPtr userToken)
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Info(this, $"_context(set):{_context != null} userToken:{userToken}");
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, $"_context(set):{_context != null} userToken:{userToken}");
 
             // If no flowing, just complete regularly.
             if ((_flags & StateFlags.PostBlockStarted) == 0)
@@ -390,7 +366,7 @@ namespace System.Net
 
         private void CompleteCallback()
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Info(this, "Context set, calling callback.");
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, "Context set, calling callback.");
             base.Complete(IntPtr.Zero);
         }
 

@@ -146,7 +146,7 @@ namespace System.IO.Pipes
             {
                 if (!Interop.Kernel32.ConnectNamedPipe(InternalHandle!, IntPtr.Zero))
                 {
-                    int errorCode = Marshal.GetLastWin32Error();
+                    int errorCode = Marshal.GetLastPInvokeError();
 
                     if (errorCode != Interop.Errors.ERROR_PIPE_CONNECTED)
                     {
@@ -211,7 +211,7 @@ namespace System.IO.Pipes
                 return new string(userName);
             }
 
-            return HandleGetImpersonationUserNameError(Marshal.GetLastWin32Error(), UserNameMaxLength, userName);
+            return HandleGetImpersonationUserNameError(Marshal.GetLastPInvokeError(), UserNameMaxLength, userName);
         }
 
         // This method calls a delegate while impersonating the client. Note that we will not have
@@ -221,7 +221,17 @@ namespace System.IO.Pipes
         {
             CheckWriteOperations();
             ExecuteHelper execHelper = new ExecuteHelper(impersonationWorker, InternalHandle);
-            RuntimeHelpers.ExecuteCodeWithGuaranteedCleanup(tryCode, cleanupCode, execHelper);
+            bool exceptionThrown = true;
+
+            try
+            {
+                ImpersonateAndTryCode(execHelper);
+                exceptionThrown = false;
+            }
+            finally
+            {
+                RevertImpersonationOnBackout(execHelper, exceptionThrown);
+            }
 
             // now handle win32 impersonate/revert specific errors by throwing corresponding exceptions
             if (execHelper._impersonateErrorCode != 0)
@@ -234,11 +244,6 @@ namespace System.IO.Pipes
             }
         }
 
-        // the following are needed for CER
-
-        private static readonly RuntimeHelpers.TryCode tryCode = new RuntimeHelpers.TryCode(ImpersonateAndTryCode);
-        private static readonly RuntimeHelpers.CleanupCode cleanupCode = new RuntimeHelpers.CleanupCode(RevertImpersonationOnBackout);
-
         private static void ImpersonateAndTryCode(object? helper)
         {
             ExecuteHelper execHelper = (ExecuteHelper)helper!;
@@ -249,7 +254,7 @@ namespace System.IO.Pipes
             }
             else
             {
-                execHelper._impersonateErrorCode = Marshal.GetLastWin32Error();
+                execHelper._impersonateErrorCode = Marshal.GetLastPInvokeError();
             }
 
             if (execHelper._mustRevert)
@@ -267,12 +272,12 @@ namespace System.IO.Pipes
             {
                 if (!Interop.Advapi32.RevertToSelf())
                 {
-                    execHelper._revertImpersonateErrorCode = Marshal.GetLastWin32Error();
+                    execHelper._revertImpersonateErrorCode = Marshal.GetLastPInvokeError();
                 }
             }
         }
 
-        internal class ExecuteHelper
+        internal sealed class ExecuteHelper
         {
             internal PipeStreamImpersonationWorker _userCode;
             internal SafePipeHandle? _handle;
@@ -301,7 +306,7 @@ namespace System.IO.Pipes
 
             if (!Interop.Kernel32.ConnectNamedPipe(InternalHandle!, completionSource.Overlapped))
             {
-                int errorCode = Marshal.GetLastWin32Error();
+                int errorCode = Marshal.GetLastPInvokeError();
 
                 switch (errorCode)
                 {

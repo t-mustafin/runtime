@@ -12,7 +12,7 @@ namespace System.Net
     ///     The FtpDataStream class implements the FTP data connection.
     /// </para>
     /// </summary>
-    internal class FtpDataStream : Stream, ICloseEx
+    internal sealed class FtpDataStream : Stream, ICloseEx
     {
         private readonly FtpWebRequest _request;
         private readonly NetworkStream _networkStream;
@@ -25,7 +25,7 @@ namespace System.Net
 
         internal FtpDataStream(NetworkStream networkStream, FtpWebRequest request, TriState writeOnly)
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Info(this);
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this);
 
             _readable = true;
             _writeable = true;
@@ -59,7 +59,7 @@ namespace System.Net
         //TODO: Add this to FxCopBaseline.cs once https://github.com/dotnet/roslyn/issues/15728 is fixed
         void ICloseEx.CloseEx(CloseExState closeState)
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Info(this, $"state = {closeState}");
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, $"state = {closeState}");
 
             lock (this)
             {

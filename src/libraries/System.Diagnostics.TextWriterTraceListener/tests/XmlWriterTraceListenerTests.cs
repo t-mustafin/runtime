@@ -18,9 +18,16 @@ namespace System.Diagnostics.TextWriterTraceListenerTests
 
         public XmlWriterTraceListenerTests()
         {
-            using (var process = Process.GetCurrentProcess())
+            try
             {
-                _processName = process.ProcessName;
+                using (var process = Process.GetCurrentProcess())
+                {
+                    _processName = process.ProcessName;
+                }
+            }
+            catch (PlatformNotSupportedException) // Process isn't supported on Browser
+            {
+                _processName = string.Empty;
             }
         }
 
@@ -102,12 +109,9 @@ namespace System.Diagnostics.TextWriterTraceListenerTests
         {
             // Ensure we use an arbitrary ID that doesn't match the process ID or thread ID.
             int traceTransferId = 1;
-            using (Process p = Process.GetCurrentProcess())
+            while (traceTransferId == Environment.ProcessId || traceTransferId == Environment.CurrentManagedThreadId)
             {
-                while (traceTransferId == p.Id || traceTransferId == Environment.CurrentManagedThreadId)
-                {
-                    traceTransferId++;
-                }
+                traceTransferId++;
             }
 
             string file = GetTestFilePath();
@@ -156,6 +160,7 @@ namespace System.Diagnostics.TextWriterTraceListenerTests
         [InlineData("<Escaped Message>", "&lt;Escaped Message&gt;")]
         [InlineData("&\"\'", "&amp;\"\'")]
         [InlineData("Hello\n\r", "Hello\n\r")]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50925", TestPlatforms.Android)]
         public void WriteTest(string message, string expectedXml)
         {
             string file = GetTestFilePath();
@@ -182,6 +187,7 @@ namespace System.Diagnostics.TextWriterTraceListenerTests
         [Theory]
         [InlineData("Fail:", null)]
         [InlineData("Fail:", "the process failed when running")]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50925", TestPlatforms.Android)]
         public void FailTest(string message, string detailMessage)
         {
             string file = GetTestFilePath();

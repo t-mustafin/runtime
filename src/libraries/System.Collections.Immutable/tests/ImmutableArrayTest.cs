@@ -16,7 +16,7 @@ namespace System.Collections.Immutable.Tests
 {
     public class ImmutableArrayTest : SimpleElementImmutablesTestBase
     {
-        private static readonly ImmutableArray<int> s_emptyDefault;
+        private static readonly ImmutableArray<int> s_emptyDefault = default; // init explicitly to avoid CS0649
         private static readonly ImmutableArray<int> s_empty = ImmutableArray.Create<int>();
         private static readonly ImmutableArray<int> s_oneElement = ImmutableArray.Create(1);
         private static readonly ImmutableArray<int> s_manyElements = ImmutableArray.Create(1, 2, 3);
@@ -1984,6 +1984,8 @@ namespace System.Collections.Immutable.Tests
 
         [Theory]
         [MemberData(nameof(IStructuralEquatableGetHashCodeData))]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50579", TestPlatforms.Android)]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/36876", TestPlatforms.iOS | TestPlatforms.tvOS | TestPlatforms.MacCatalyst)]
         public void IStructuralEquatableGetHashCode(IEnumerable<int> source, IEqualityComparer comparer)
         {
             var array = source.ToImmutableArray();

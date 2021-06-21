@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Collections.Generic;
 using System.Data.SqlTypes;
 using System.Data.Common;
@@ -10,21 +11,23 @@ namespace System.Data
 {
     internal sealed class DataExpression : IFilter
     {
-        internal string _originalExpression;  // original, unoptimized string
+        internal string? _originalExpression;  // original, unoptimized string
 
         private readonly bool _parsed;
         private bool _bound;
-        private ExpressionNode _expr;
-        private DataTable _table;
+        private ExpressionNode? _expr;
+        private DataTable? _table;
         private readonly StorageType _storageType;
-        private readonly Type _dataType;  // This set if the expression is part of ExpressionCoulmn
+        private readonly Type? _dataType;  // This set if the expression is part of ExpressionCoulmn
         private DataColumn[] _dependency = Array.Empty<DataColumn>();
 
-        internal DataExpression(DataTable table, string expression) : this(table, expression, null)
+        [RequiresUnreferencedCode("Members of types used in the expression might be trimmed")]
+        internal DataExpression(DataTable? table, string? expression) : this(table, expression, null)
         {
         }
 
-        internal DataExpression(DataTable table, string expression, Type type)
+        [RequiresUnreferencedCode("Members of types used in the expression might be trimmed")]
+        internal DataExpression(DataTable? table, string? expression, Type? type)
         {
             ExpressionParser parser = new ExpressionParser(table);
             parser.LoadExpression(expression);
@@ -32,12 +35,13 @@ namespace System.Data
             _originalExpression = expression;
             _expr = null;
 
+            // Note: nobody seems to pass a null expression in the codebase
             if (expression != null)
             {
                 _storageType = DataStorage.GetStorageType(type);
                 if (_storageType == StorageType.BigInteger)
                 {
-                    throw ExprException.UnsupportedDataType(type);
+                    throw ExprException.UnsupportedDataType(type!);
                 }
 
                 _dataType = type;
@@ -62,7 +66,7 @@ namespace System.Data
             }
         }
 
-        internal ExpressionNode ExpressionNode
+        internal ExpressionNode? ExpressionNode
         {
             get
             {
@@ -78,7 +82,7 @@ namespace System.Data
             }
         }
 
-        internal void Bind(DataTable table)
+        internal void Bind(DataTable? table)
         {
             _table = table;
 
@@ -111,17 +115,20 @@ namespace System.Data
 
         internal object Evaluate()
         {
-            return Evaluate((DataRow)null, DataRowVersion.Default);
+            return Evaluate((DataRow?)null, DataRowVersion.Default);
         }
 
-        internal object Evaluate(DataRow row, DataRowVersion version)
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
+            Justification = "Constructors taking expression are marked as unsafe")]
+        internal object Evaluate(DataRow? row, DataRowVersion version)
         {
-            object result;
+            object? result;
 
             if (!_bound)
             {
                 Bind(_table);
             }
+            // Note: _expr is always non-null in the current codebase
             if (_expr != null)
             {
                 result = _expr.Eval(row, version);
@@ -133,13 +140,14 @@ namespace System.Data
                     {
                         if (StorageType.Object != _storageType)
                         {
-                            result = SqlConvert.ChangeType2(result, _storageType, _dataType, _table.FormatProvider);
+                            // TODO: _dataType can be null, probably a bug
+                            result = SqlConvert.ChangeType2(result, _storageType, _dataType!, _table!.FormatProvider);
                         }
                     }
                     catch (Exception e) when (ADP.IsCatchableExceptionType(e))
                     {
                         ExceptionBuilder.TraceExceptionForCapture(e);
-                        throw ExprException.DatavalueConvertion(result, _dataType, e);
+                        throw ExprException.DatavalueConvertion(result, _dataType!, e);
                     }
                 }
             }
@@ -147,7 +155,7 @@ namespace System.Data
             {
                 result = null;
             }
-            return result;
+            return result!;
         }
 
         internal object Evaluate(DataRow[] rows)
@@ -155,7 +163,8 @@ namespace System.Data
             return Evaluate(rows, DataRowVersion.Default);
         }
 
-
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
+            Justification = "Constructors taking expression are marked as unsafe")]
         internal object Evaluate(DataRow[] rows, DataRowVersion version)
         {
             if (!_bound)
@@ -182,6 +191,8 @@ namespace System.Data
             }
         }
 
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
+            Justification = "Constructors taking expression are marked as unsafe")]
         public bool Invoke(DataRow row, DataRowVersion version)
         {
             if (_expr == null)

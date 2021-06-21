@@ -1,13 +1,12 @@
 ﻿' Licensed to the .NET Foundation under one or more agreements.
 ' The .NET Foundation licenses this file to you under the MIT license.
-' See the LICENSE file in the project root for more information.
 Option Strict On
 Option Explicit On
 
 Imports System
+Imports System.Diagnostics.CodeAnalysis
 Imports System.Environment
 Imports System.Reflection
-Imports Microsoft.VisualBasic.CompilerServices.Utils
 Imports ExUtils = Microsoft.VisualBasic.CompilerServices.ExceptionUtils
 
 Namespace Microsoft.VisualBasic.FileIO
@@ -121,6 +120,8 @@ Namespace Microsoft.VisualBasic.FileIO
         ''' will work with Roaming User as well.
         ''' </remarks>
         Public Shared ReadOnly Property CurrentUserApplicationData() As String
+            <UnconditionalSuppressMessage("ReflectionAnalsys", "IL2026:RequiresUnreferencedCode",
+                Justification:="Trimmer warns because it can't see System.Windows.Forms.Application. If the assembly is there, the trimmer will be able to tell to preserve the method specified.")>
             Get
                 Return GetDirectoryPath(GetWindowsFormsDirectory("System.Windows.Forms.Application", "UserAppDataPath"), SR.IO_SpecialDirectory_UserAppData)
             End Get
@@ -138,6 +139,8 @@ Namespace Microsoft.VisualBasic.FileIO
         ''' See above for reason why we don't use System.Environment.GetFolderPath(*).
         ''' </remarks>
         Public Shared ReadOnly Property AllUsersApplicationData() As String
+            <UnconditionalSuppressMessage("ReflectionAnalsys", "IL2026:RequiresUnreferencedCode",
+                Justification:="Trimmer warns because it can't see System.Windows.Forms.Application. If the assembly is there, the trimmer will be able to tell to preserve the method specified.")>
             Get
                 Return GetDirectoryPath(GetWindowsFormsDirectory("System.Windows.Forms.Application", "CommonAppDataPath"), SR.IO_SpecialDirectory_AllUserAppData)
             End Get
@@ -157,8 +160,9 @@ Namespace Microsoft.VisualBasic.FileIO
             Return FileSystem.NormalizePath(Directory)
         End Function
 
+        <RequiresUnreferencedCode("Cannot statically analyze the passed in type.")>
         Private Shared Function GetWindowsFormsDirectory(typeName As String, propertyName As String) As String
-            Dim type As Type = type.GetType($"{typeName}, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a", throwOnError:=False)
+            Dim type As Type = Type.GetType($"{typeName}, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a", throwOnError:=False)
             Dim [property] As PropertyInfo = type?.GetProperty(propertyName)
             If [property] Is Nothing Then
                 Return ""

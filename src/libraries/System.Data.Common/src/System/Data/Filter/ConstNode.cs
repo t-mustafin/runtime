@@ -4,6 +4,7 @@
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data
 {
@@ -11,11 +12,11 @@ namespace System.Data
     {
         internal readonly object _val;
 
-        internal ConstNode(DataTable table, ValueType type, object constant) : this(table, type, constant, true)
+        internal ConstNode(DataTable? table, ValueType type, object constant) : this(table, type, constant, true)
         {
         }
 
-        internal ConstNode(DataTable table, ValueType type, object constant, bool fParseQuotes) : base(table)
+        internal ConstNode(DataTable? table, ValueType type, object constant, bool fParseQuotes) : base(table)
         {
             switch (type)
             {
@@ -68,16 +69,19 @@ namespace System.Data
             BindTable(table);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal override object Eval()
         {
             return _val;
         }
 
-        internal override object Eval(DataRow row, DataRowVersion version)
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
+        internal override object Eval(DataRow? row, DataRowVersion version)
         {
             return Eval();
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal override object Eval(int[] recordNos)
         {
             return Eval();
@@ -115,7 +119,7 @@ namespace System.Data
             }
             else
             {
-                string sval = (constant as string);
+                string? sval = (constant as string);
                 if (null != sval)
                 {
                     decimal r12;
@@ -132,7 +136,7 @@ namespace System.Data
                 }
                 else
                 {
-                    IConvertible convertible = (constant as IConvertible);
+                    IConvertible? convertible = (constant as IConvertible);
                     if (null != convertible)
                     {
                         try
@@ -189,7 +193,7 @@ namespace System.Data
             }
             else
             {
-                string sval = (constant as string);
+                string? sval = (constant as string);
                 if (null != sval)
                 {
                     int i4;
@@ -210,7 +214,7 @@ namespace System.Data
                 }
                 else
                 {
-                    IConvertible convertible = (constant as IConvertible);
+                    IConvertible? convertible = (constant as IConvertible);
                     if (null != convertible)
                     {
                         try

@@ -1,7 +1,6 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-#nullable enable
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -17,7 +16,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace System.Xml.Schema
 {
-    public delegate object XmlValueGetter();
+    public delegate object? XmlValueGetter();
 
     [Flags]
     public enum XmlSchemaValidationFlags
@@ -45,7 +44,7 @@ namespace System.Xml.Schema
         SkipToEndElement,
         Finish,
     }
-    internal class IdRefNode
+    internal sealed class IdRefNode
     {
         internal string Id;
         internal int LineNo;
@@ -141,13 +140,6 @@ namespace System.Xml.Schema
 
         //Error message constants
         private const char Quote = '\'';
-
-        //Empty arrays
-        private static readonly XmlSchemaParticle[] s_emptyParticleArray = Array.Empty<XmlSchemaParticle>();
-        private static readonly XmlSchemaAttribute[] s_emptyAttributeArray = Array.Empty<XmlSchemaAttribute>();
-
-        //Whitespace check for text nodes
-        private XmlCharType _xmlCharType = XmlCharType.Instance;
 
         internal static bool[,] ValidStates = new bool[12, 12] {
                                                /*ValidatorState.None*/      /*ValidatorState.Start  /*ValidatorState.TopLevelAttribute*/     /*ValidatorState.TopLevelTOrWS*/ /*ValidatorState.Element*/      /*ValidatorState.Attribute*/    /*ValidatorState.EndAttributes*/    /*ValidatorState.Text/      /*ValidatorState.WS/*       /*ValidatorState.EndElement*/   /*ValidatorState.SkipToEndElement*/         /*ValidatorState.Finish*/
@@ -677,7 +669,7 @@ namespace System.Xml.Schema
                         object attValue;
                         if (attributeValueGetter != null)
                         {
-                            attValue = attributeValueGetter();
+                            attValue = attributeValueGetter()!;
                         }
                         else
                         {
@@ -821,7 +813,7 @@ namespace System.Xml.Schema
                     case XmlSchemaContentType.TextOnly:
                         if (elementValueGetter != null)
                         {
-                            SaveTextValue(elementValueGetter());
+                            SaveTextValue(elementValueGetter()!);
                         }
                         else
                         {
@@ -830,8 +822,8 @@ namespace System.Xml.Schema
                         break;
 
                     case XmlSchemaContentType.ElementOnly:
-                        string textValue = elementValueGetter != null ? elementValueGetter().ToString()! : elementStringValue!;
-                        if (_xmlCharType.IsOnlyWhitespace(textValue))
+                        string textValue = elementValueGetter != null ? elementValueGetter()!.ToString()! : elementStringValue!;
+                        if (XmlCharType.IsOnlyWhitespace(textValue))
                         {
                             break;
                         }
@@ -852,7 +844,7 @@ namespace System.Xml.Schema
                         {
                             if (elementValueGetter != null)
                             {
-                                SaveTextValue(elementValueGetter());
+                                SaveTextValue(elementValueGetter()!);
                             }
                             else
                             {
@@ -905,7 +897,7 @@ namespace System.Xml.Schema
                     case XmlSchemaContentType.TextOnly:
                         if (elementValueGetter != null)
                         {
-                            SaveTextValue(elementValueGetter());
+                            SaveTextValue(elementValueGetter()!);
                         }
                         else
                         {
@@ -918,7 +910,7 @@ namespace System.Xml.Schema
                         {
                             if (elementValueGetter != null)
                             {
-                                SaveTextValue(elementValueGetter());
+                                SaveTextValue(elementValueGetter()!);
                             }
                             else
                             {
@@ -1007,7 +999,7 @@ namespace System.Xml.Schema
                         return new XmlSchemaParticle[1] { element };
                     }
 
-                    return s_emptyParticleArray;
+                    return Array.Empty<XmlSchemaParticle>();
                 }
                 else
                 {
@@ -1032,7 +1024,7 @@ namespace System.Xml.Schema
                 }
             }
 
-            return s_emptyParticleArray;
+            return Array.Empty<XmlSchemaParticle>();
         }
 
         public XmlSchemaAttribute[] GetExpectedAttributes()
@@ -1069,7 +1061,7 @@ namespace System.Xml.Schema
                     }
                 }
             }
-            return s_emptyAttributeArray;
+            return Array.Empty<XmlSchemaAttribute>();
         }
 
         internal void GetUnspecifiedDefaultAttributes(ArrayList defaultAttributes, bool createNodeData)

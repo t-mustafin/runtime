@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace System.Data
@@ -15,7 +16,7 @@ namespace System.Data
     public abstract class EnumerableRowCollection : IEnumerable
     {
         internal abstract Type ElementType { get; }
-        internal abstract DataTable Table { get; }
+        internal abstract DataTable? Table { get; }
 
         internal EnumerableRowCollection()
         {
@@ -23,7 +24,7 @@ namespace System.Data
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return null;
+            return null!;
         }
     }
 
@@ -32,14 +33,14 @@ namespace System.Data
     /// </summary>
     public class EnumerableRowCollection<TRow> : EnumerableRowCollection, IEnumerable<TRow>
     {
-        private readonly DataTable _table;
+        private readonly DataTable? _table;
         private readonly IEnumerable<TRow> _enumerableRows;
         private readonly List<Func<TRow, bool>> _listOfPredicates;
 
         // Stores list of sort expression in the order provided by user. E.g. order by, thenby, thenby descending..
         private readonly SortExpressionBuilder<TRow> _sortExpression;
 
-        private readonly Func<TRow, TRow> _selector;
+        private readonly Func<TRow, TRow>? _selector;
 
         internal override Type ElementType
         {
@@ -58,7 +59,7 @@ namespace System.Data
             }
         }
 
-        internal override DataTable Table
+        internal override DataTable? Table
         {
             get
             {
@@ -70,7 +71,7 @@ namespace System.Data
         /// This constructor is used when Select operator is called with output Type other than input row Type.
         /// Basically fail on GetLDV(), but other LINQ operators must work.
         /// </summary>
-        internal EnumerableRowCollection(IEnumerable<TRow> enumerableRows, bool isDataViewable, DataTable table)
+        internal EnumerableRowCollection(IEnumerable<TRow> enumerableRows, bool isDataViewable, DataTable? table)
         {
             Debug.Assert(!isDataViewable || table != null, "isDataViewable bug table is null");
 
@@ -98,7 +99,7 @@ namespace System.Data
         /// Copy Constructor that sets the input IEnumerable as enumerableRows
         /// Used to maintain IEnumerable that has linq operators executed in the same order as the user
         /// </summary>
-        internal EnumerableRowCollection(EnumerableRowCollection<TRow> source, IEnumerable<TRow> enumerableRows, Func<TRow, TRow> selector)
+        internal EnumerableRowCollection(EnumerableRowCollection<TRow>? source, IEnumerable<TRow> enumerableRows, Func<TRow, TRow>? selector)
         {
             Debug.Assert(null != enumerableRows, "null enumerableRows");
 
@@ -148,11 +149,11 @@ namespace System.Data
                 throw DataSetUtil.NotSupported(SR.ToLDVUnsupported);
             }
 
-            LinqDataView view = null;
+            LinqDataView? view = null;
 
             #region BuildSinglePredicate
 
-            Func<DataRow, bool> finalPredicate = null; // Conjunction of all .Where(..) predicates
+            Func<DataRow, bool>? finalPredicate = null; // Conjunction of all .Where(..) predicates
             if ((null != _selector) && (0 < _listOfPredicates.Count))
             {
                 // Hook up all individual predicates into one predicate
@@ -299,7 +300,7 @@ namespace System.Data
             _sortExpression.Add(
                     delegate (TRow input)
                     {
-                        return keySelector(input);
+                        return keySelector(input)!;
                     },
                     delegate (object val1, object val2)
                     {

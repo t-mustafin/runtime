@@ -1,7 +1,6 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System.Runtime.InteropServices;
 using Xunit;
 
 namespace System.IO.Tests
@@ -78,6 +77,7 @@ namespace System.IO.Tests
 
         [Fact]
         [PlatformSpecific(CaseSensitivePlatforms)]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/52857", TestPlatforms.MacCatalyst)]
         public void CaseSensitivity()
         {
             Assert.False(new DirectoryInfo(TestDirectory.ToUpperInvariant()).Exists);
@@ -111,7 +111,7 @@ namespace System.IO.Tests
         }
 
         [Fact]
-        [PlatformSpecific(TestPlatforms.AnyUnix)]  // Uses P/Invokes
+        [PlatformSpecific(TestPlatforms.AnyUnix & ~TestPlatforms.Browser)]  // Uses P/Invokes
         public void FalseForNonRegularFile()
         {
             string fileName = GetTestFilePath();
@@ -157,7 +157,7 @@ namespace System.IO.Tests
             pathFI.Refresh();
             Assert.False(pathFI.Exists, "path should now not exist");
             linkPathFI.Refresh();
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (OperatingSystem.IsWindows())
             {
                 Assert.True(linkPathFI.Exists, "linkPath directory should still exist");
                 Assert.False(File.Exists(linkPath), "linkPath file should not exist");

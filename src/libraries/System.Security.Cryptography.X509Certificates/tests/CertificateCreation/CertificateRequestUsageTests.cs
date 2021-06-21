@@ -493,6 +493,7 @@ namespace System.Security.Cryptography.X509Certificates.Tests.CertificateCreatio
         [InlineData("Empty", "")]
         [InlineData("Reserved Tag", "0F00")]
         [InlineData("Zero Tag", "0000")]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50937", TestPlatforms.Android)]
         public static void InvalidPublicKeyEncoding(string caseName, string parametersHex)
         {
             _ = caseName;
@@ -525,6 +526,7 @@ namespace System.Security.Cryptography.X509Certificates.Tests.CertificateCreatio
         [InlineData("Non-Nested Data", "300206035102013001")]
         [InlineData("Indefinite Encoding", "3002060351020130800000")]
         [InlineData("Dangling LengthLength", "300206035102013081")]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50937", TestPlatforms.Android)]
         public static void InvalidSignatureAlgorithmEncoding(string caseName, string sigAlgHex)
         {
             _ = caseName;
@@ -550,6 +552,158 @@ namespace System.Security.Cryptography.X509Certificates.Tests.CertificateCreatio
                 Assert.Contains("ASN1", exception.Message, StringComparison.OrdinalIgnoreCase);
             }
 #endif
+        }
+
+        [Fact]
+        public static void ECDSA_Signing_ECDH()
+        {
+            using ECDsa ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            using ECDiffieHellman ecdh = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+
+            CertificateRequest issuerRequest = new CertificateRequest(
+                new X500DistinguishedName("CN=root"),
+                ecdsa,
+                HashAlgorithmName.SHA256);
+
+            issuerRequest.CertificateExtensions.Add(
+                new X509BasicConstraintsExtension(true, false, 0, true));
+
+            CertificateRequest request = new CertificateRequest(
+                new X500DistinguishedName("CN=test"),
+                new PublicKey(ecdh),
+                HashAlgorithmName.SHA256);
+
+            request.CertificateExtensions.Add(
+                new X509BasicConstraintsExtension(false, false, 0, true));
+            request.CertificateExtensions.Add(
+                new X509KeyUsageExtension(X509KeyUsageFlags.KeyAgreement, true));
+
+            DateTimeOffset notBefore = DateTimeOffset.UtcNow;
+            DateTimeOffset notAfter = notBefore.AddDays(30);
+            byte[] serial = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+
+            using X509Certificate2 issuer = issuerRequest.CreateSelfSigned(notBefore, notAfter);
+            using X509Certificate2 cert = request.Create(issuer, notBefore, notAfter, serial);
+            using ECDiffieHellman publicCertKey = cert.GetECDiffieHellmanPublicKey();
+
+            Assert.NotNull(publicCertKey);
+            Assert.Equal(ecdh.ExportSubjectPublicKeyInfo(), publicCertKey.ExportSubjectPublicKeyInfo());
+
+            Assert.Null(cert.GetECDsaPublicKey());
+        }
+
+        [Fact]
+        public static void ECDSA_Signing_ECDH_NoKeyUsageValidForECDSAAndECDH()
+        {
+            using ECDsa ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            using ECDiffieHellman ecdh = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+
+            CertificateRequest issuerRequest = new CertificateRequest(
+                new X500DistinguishedName("CN=root"),
+                ecdsa,
+                HashAlgorithmName.SHA256);
+
+            issuerRequest.CertificateExtensions.Add(
+                new X509BasicConstraintsExtension(true, false, 0, true));
+
+            CertificateRequest request = new CertificateRequest(
+                new X500DistinguishedName("CN=test"),
+                new PublicKey(ecdh),
+                HashAlgorithmName.SHA256);
+
+            request.CertificateExtensions.Add(
+                new X509BasicConstraintsExtension(false, false, 0, true));
+
+            DateTimeOffset notBefore = DateTimeOffset.UtcNow;
+            DateTimeOffset notAfter = notBefore.AddDays(30);
+            byte[] serial = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+
+            using X509Certificate2 issuer = issuerRequest.CreateSelfSigned(notBefore, notAfter);
+            using X509Certificate2 cert = request.Create(issuer, notBefore, notAfter, serial);
+            using ECDiffieHellman publicCertEcDhKey = cert.GetECDiffieHellmanPublicKey();
+            using ECDsa publicCertEcDsaKey = cert.GetECDsaPublicKey();
+            byte[] expectedSubjectPublicKeyInfo = ecdh.ExportSubjectPublicKeyInfo();
+
+            Assert.NotNull(publicCertEcDhKey);
+            Assert.NotNull(publicCertEcDsaKey);
+            Assert.Equal(expectedSubjectPublicKeyInfo, publicCertEcDhKey.ExportSubjectPublicKeyInfo());
+            Assert.Equal(expectedSubjectPublicKeyInfo, publicCertEcDsaKey.ExportSubjectPublicKeyInfo());
+        }
+
+        [Fact]
+        public static void ECDSA_Signing_ECDSA_NoKeyUsageValidForECDSAAndECDH()
+        {
+            using ECDsa ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            using ECDsa ecdsaLeaf = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+
+            CertificateRequest issuerRequest = new CertificateRequest(
+                new X500DistinguishedName("CN=root"),
+                ecdsa,
+                HashAlgorithmName.SHA256);
+
+            issuerRequest.CertificateExtensions.Add(
+                new X509BasicConstraintsExtension(true, false, 0, true));
+
+            CertificateRequest request = new CertificateRequest(
+                new X500DistinguishedName("CN=test"),
+                ecdsaLeaf,
+                HashAlgorithmName.SHA256);
+
+            request.CertificateExtensions.Add(
+                new X509BasicConstraintsExtension(false, false, 0, true));
+
+            DateTimeOffset notBefore = DateTimeOffset.UtcNow;
+            DateTimeOffset notAfter = notBefore.AddDays(30);
+            byte[] serial = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+
+            using X509Certificate2 issuer = issuerRequest.CreateSelfSigned(notBefore, notAfter);
+            using X509Certificate2 cert = request.Create(issuer, notBefore, notAfter, serial);
+            using ECDiffieHellman publicCertEcDhKey = cert.GetECDiffieHellmanPublicKey();
+            using ECDsa publicCertEcDsaKey = cert.GetECDsaPublicKey();
+            byte[] expectedSubjectPublicKeyInfo = ecdsaLeaf.ExportSubjectPublicKeyInfo();
+
+            Assert.NotNull(publicCertEcDhKey);
+            Assert.NotNull(publicCertEcDsaKey);
+            Assert.Equal(expectedSubjectPublicKeyInfo, publicCertEcDhKey.ExportSubjectPublicKeyInfo());
+            Assert.Equal(expectedSubjectPublicKeyInfo, publicCertEcDsaKey.ExportSubjectPublicKeyInfo());
+        }
+
+        [Fact]
+        public static void ECDSA_Signing_UnknownPublicKeyAlgorithm()
+        {
+            using ECDsa ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            PublicKey gostRPublicKey = PublicKey.CreateFromSubjectPublicKeyInfo(
+                TestData.GostR3410SubjectPublicKeyInfo,
+                out _);
+
+            CertificateRequest issuerRequest = new CertificateRequest(
+                new X500DistinguishedName("CN=root"),
+                ecdsa,
+                HashAlgorithmName.SHA256);
+
+            issuerRequest.CertificateExtensions.Add(
+                new X509BasicConstraintsExtension(true, false, 0, true));
+
+            CertificateRequest request = new CertificateRequest(
+                new X500DistinguishedName("CN=test"),
+                gostRPublicKey,
+                HashAlgorithmName.SHA256);
+
+            request.CertificateExtensions.Add(
+                new X509BasicConstraintsExtension(false, false, 0, true));
+
+            DateTimeOffset notBefore = DateTimeOffset.UtcNow;
+            DateTimeOffset notAfter = notBefore.AddDays(30);
+            byte[] serial = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+
+            using X509Certificate2 issuer = issuerRequest.CreateSelfSigned(notBefore, notAfter);
+
+            X509SignatureGenerator ecdsaGenerator = X509SignatureGenerator.CreateForECDsa(ecdsa);
+            using X509Certificate2 cert = request.Create(issuer.SubjectName, ecdsaGenerator, notBefore, notAfter, serial);
+
+            Assert.Null(cert.GetECDsaPublicKey());
+            Assert.Null(cert.GetECDiffieHellmanPublicKey());
+            Assert.Equal("1.2.643.2.2.19", cert.PublicKey.Oid.Value);
         }
 
         [Fact]

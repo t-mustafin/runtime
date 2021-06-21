@@ -1,8 +1,9 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization.Metadata;
 
 namespace System.Text.Json.Serialization.Converters
 {
@@ -14,8 +15,8 @@ namespace System.Text.Json.Serialization.Converters
     {
         protected override object CreateObject(ref ReadStackFrame frame)
         {
-            var createObject = (JsonClassInfo.ParameterizedConstructorDelegate<T, TArg0, TArg1, TArg2, TArg3>)
-                frame.JsonClassInfo.CreateObjectWithArgs!;
+            var createObject = (JsonTypeInfo.ParameterizedConstructorDelegate<T, TArg0, TArg1, TArg2, TArg3>)
+                frame.JsonTypeInfo.CreateObjectWithArgs!;
             var arguments = (Arguments<TArg0, TArg1, TArg2, TArg3>)frame.CtorArgumentState!.Arguments;
             return createObject!(arguments.Arg0, arguments.Arg1, arguments.Arg2, arguments.Arg3);
         }
@@ -63,23 +64,34 @@ namespace System.Text.Json.Serialization.Converters
 
             var info = (JsonParameterInfo<TArg>)jsonParameterInfo;
             var converter = (JsonConverter<TArg>)jsonParameterInfo.ConverterBase;
-            return converter.TryRead(ref reader, info.RuntimePropertyType, info.Options!, ref state, out arg!);
+
+            bool success = converter.TryRead(ref reader, info.RuntimePropertyType, info.Options!, ref state, out TArg? value);
+
+            arg = value == null && jsonParameterInfo.IgnoreDefaultValuesOnRead
+                ? (TArg?)info.DefaultValue! // Use default value specified on parameter, if any.
+                : value!;
+
+            return success;
         }
 
         protected override void InitializeConstructorArgumentCaches(ref ReadStack state, JsonSerializerOptions options)
         {
-            JsonClassInfo classInfo = state.Current.JsonClassInfo;
+            JsonTypeInfo typeInfo = state.Current.JsonTypeInfo;
 
-            if (classInfo.CreateObjectWithArgs == null)
+            if (typeInfo.CreateObjectWithArgs == null)
             {
-                classInfo.CreateObjectWithArgs =
+                typeInfo.CreateObjectWithArgs =
                     options.MemberAccessorStrategy.CreateParameterizedConstructor<T, TArg0, TArg1, TArg2, TArg3>(ConstructorInfo!);
             }
 
             var arguments = new Arguments<TArg0, TArg1, TArg2, TArg3>();
 
-            foreach (JsonParameterInfo parameterInfo in classInfo.ParameterCache!.Values)
+            List<KeyValuePair<string, JsonParameterInfo?>> cache = typeInfo.ParameterCache!.List;
+            for (int i = 0; i < typeInfo.ParameterCount; i++)
             {
+                JsonParameterInfo? parameterInfo = cache[i].Value;
+                Debug.Assert(parameterInfo != null);
+
                 if (parameterInfo.ShouldDeserialize)
                 {
                     int position = parameterInfo.Position;

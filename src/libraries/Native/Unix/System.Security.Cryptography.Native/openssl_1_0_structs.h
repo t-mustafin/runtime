@@ -80,6 +80,9 @@ struct rsa_st
     BIGNUM* dmp1;
     BIGNUM* dmq1;
     BIGNUM* iqmp;
+    struct crypto_ex_data_10_st ex_data;
+    int _ignored3;
+    int flags;
 };
 
 struct x509_cinf_st
@@ -164,4 +167,19 @@ struct x509_store_st
     const void* _ignored1;
     const void* _ignored2;
     X509_VERIFY_PARAM* param;
+};
+
+struct bio_st {
+    const void* _ignored1;
+    const void* _ignored2;
+    const void* _ignored3;
+    int _ignored4;
+    int _ignored5;
+    int _ignored6;
+    int _ignored7;
+    int _ignored8;
+    const void*_ignored9;
+    const void*_ignored10;
+    const void*_ignored11;
+    int references;
 };

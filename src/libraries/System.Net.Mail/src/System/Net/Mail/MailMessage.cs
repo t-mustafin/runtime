@@ -32,7 +32,7 @@ namespace System.Net.Mail
         public MailMessage()
         {
             _message = new Message();
-            if (NetEventSource.IsEnabled) NetEventSource.Associate(this, _message);
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Associate(this, _message);
         }
 
         public MailMessage(string from, string to)
@@ -50,7 +50,7 @@ namespace System.Net.Mail
                 throw new ArgumentException(SR.Format(SR.net_emptystringcall, nameof(to)), nameof(to));
 
             _message = new Message(from, to);
-            if (NetEventSource.IsEnabled) NetEventSource.Associate(this, _message);
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Associate(this, _message);
         }
 
 
@@ -426,17 +426,15 @@ namespace System.Net.Mail
                     part = new MimeMultiPart(MimeMultiPartType.Mixed);
                     part.Parts.Add(viewsPart);
 
-                    MimeMultiPart attachmentsPart = new MimeMultiPart(MimeMultiPartType.Mixed);
                     foreach (Attachment attachment in Attachments)
                     {
                         if (attachment != null)
                         {
                             //ensure we can read from the stream.
                             attachment.PrepareForSending(allowUnicode);
-                            attachmentsPart.Parts.Add(attachment.MimePart);
+                            part.Parts.Add(attachment.MimePart);
                         }
                     }
-                    part.Parts.Add(attachmentsPart);
                     _message.Content = part;
                 }
                 // If there is no Attachement, AND only "1" Alternate View AND !!no body!!

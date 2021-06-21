@@ -1,10 +1,14 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using Microsoft.DotNet.Cli.Build.Framework;
-using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
+
+using Microsoft.DotNet.Cli.Build.Framework;
+using Microsoft.NET.HostModel.ComHost;
 using Xunit;
 
 namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting
@@ -19,17 +23,12 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting
         }
 
         [Theory]
+        [PlatformSpecific(TestPlatforms.Windows)] // COM activation is only supported on Windows
         [InlineData(1, true)]
         [InlineData(10, true)]
         [InlineData(10, false)]
         public void ActivateClass(int count, bool synchronous)
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                // COM activation is only supported on Windows
-                return;
-            }
-
             string [] args = {
                 "comhost",
                 synchronous ? "synchronous" : "concurrent",
@@ -50,14 +49,9 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting
         }
 
         [Fact]
+        [PlatformSpecific(TestPlatforms.Windows)] // COM activation is only supported on Windows
         public void ActivateClass_IgnoreAppLocalHostFxr()
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                // COM activation is only supported on Windows
-                return;
-            }
-
             using (var fixture = sharedState.ComLibraryFixture.Copy())
             {
                 File.WriteAllText(Path.Combine(fixture.TestProject.BuiltApp.Location, "hostfxr.dll"), string.Empty);
@@ -83,14 +77,9 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting
         }
 
         [Fact]
+        [PlatformSpecific(TestPlatforms.Windows)] // COM activation is only supported on Windows
         public void ActivateClass_ValidateIErrorInfoResult()
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                // COM activation is only supported on Windows
-                return;
-            }
-
             using (var fixture = sharedState.ComLibraryFixture.Copy())
             {
                 string missingRuntimeConfig = Path.Combine(fixture.TestProject.BuiltApp.Location,
@@ -117,45 +106,86 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting
             }
         }
 
+        [Fact]
+        [PlatformSpecific(TestPlatforms.Windows)] // COM activation is only supported on Windows
+        public void LoadTypeLibraries()
+        {
+            using (var fixture = sharedState.ComLibraryFixture.Copy())
+            {
+                var comHost = Path.Combine(
+                    fixture.TestProject.BuiltApp.Location,
+                    $"{ fixture.TestProject.AssemblyName }.comhost.dll");
+
+                string[] args = {
+                    "comhost",
+                    "typelib",
+                    "2",
+                    comHost,
+                    sharedState.ClsidString
+                };
+                CommandResult result = sharedState.CreateNativeHostCommand(args, fixture.BuiltDotnet.BinPath)
+                    .Execute();
+
+                result.Should().Pass()
+                    .And.HaveStdOutContaining("Loading default type library succeeded.")
+                    .And.HaveStdOutContaining("Loading type library 1 succeeded.")
+                    .And.HaveStdOutContaining("Loading type library 2 succeeded.");
+            }
+        }
+
         public class SharedTestState : SharedTestStateBase
         {
             public string ComHostPath { get; }
 
-            public string ClsidString = "{438968CE-5950-4FBC-90B0-E64691350DF5}";
+            public string ClsidString { get; } = "{438968CE-5950-4FBC-90B0-E64691350DF5}";
             public TestProjectFixture ComLibraryFixture { get; }
+
+            public string ClsidMapPath { get; }
+
+            public IReadOnlyDictionary<int, string> TypeLibraries { get; }
 
             public SharedTestState()
             {
-                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                if (!OperatingSystem.IsWindows())
                 {
                     // COM activation is only supported on Windows
                     return;
                 }
 
                 ComLibraryFixture = new TestProjectFixture("ComLibrary", RepoDirectories)
-                    .EnsureRestored(RepoDirectories.CorehostPackages)
+                    .EnsureRestored()
                     .BuildProject();
 
-                // [TODO] BEGIN - Remove once using .NET Core 3.0 to build tests
+                // Create a .clsidmap from the assembly
+                ClsidMapPath = Path.Combine(BaseDirectory, $"{ ComLibraryFixture.TestProject.AssemblyName }.clsidmap");
+                using (var assemblyStream = new FileStream(ComLibraryFixture.TestProject.AppDll, FileMode.Open, FileAccess.Read, FileShare.Delete | FileShare.Read))
+                using (var peReader = new System.Reflection.PortableExecutable.PEReader(assemblyStream))
+                {
+                    if (peReader.HasMetadata)
+                    {
+                        MetadataReader reader = peReader.GetMetadataReader();
+                        ClsidMap.Create(reader, ClsidMapPath);
+                    }
+                }
+
+                // Use the locally built comhost to create a comhost with the embedded .clsidmap
                 ComHostPath = Path.Combine(
                     ComLibraryFixture.TestProject.BuiltApp.Location,
                     $"{ ComLibraryFixture.TestProject.AssemblyName }.comhost.dll");
 
-                File.Copy(Path.Combine(RepoDirectories.CorehostPackages, "comhost.dll"), ComHostPath);
-
-                RuntimeConfig.FromFile(ComLibraryFixture.TestProject.RuntimeConfigJson)
-                    .WithFramework(new RuntimeConfig.Framework("Microsoft.NETCore.App", RepoDirectories.MicrosoftNETCoreAppVersion))
-                    .Save();
-
-                JObject clsidMap = new JObject()
+                // Include the test type libraries in the ComHost tests.
+                TypeLibraries = new Dictionary<int, string>
                 {
-                    {
-                        ClsidString,
-                        new JObject() { {"assembly", "ComLibrary" }, {"type", "ComLibrary.Server" } }
-                    }
+                    { 1, Path.Combine(RepoDirectories.Artifacts, "corehost_test", "Server.tlb") },
+                    { 2, Path.Combine(RepoDirectories.Artifacts, "corehost_test", "Nested.tlb") }
                 };
-                File.WriteAllText($"{ ComHostPath }.clsidmap", clsidMap.ToString());
-                // [TODO] END - Remove once using .NET Core 3.0 to build tests
+
+                ComHost.Create(
+                    Path.Combine(RepoDirectories.HostArtifacts, "comhost.dll"),
+                    ComHostPath,
+                    ClsidMapPath,
+                    TypeLibraries);
+
             }
 
             protected override void Dispose(bool disposing)

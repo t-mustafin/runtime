@@ -1,6 +1,5 @@
 ' Licensed to the .NET Foundation under one or more agreements.
 ' The .NET Foundation licenses this file to you under the MIT license.
-' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Security
@@ -8,6 +7,7 @@ Imports System.IO
 
 Imports Microsoft.VisualBasic.CompilerServices.ExceptionUtils
 Imports Microsoft.VisualBasic.CompilerServices.Utils
+Imports System.Diagnostics.CodeAnalysis
 
 Namespace Microsoft.VisualBasic.CompilerServices
 
@@ -44,8 +44,6 @@ Namespace Microsoft.VisualBasic.CompilerServices
             Catch ex As StackOverflowException
                 Throw ex
             Catch ex As OutOfMemoryException
-                Throw ex
-            Catch ex As System.Threading.ThreadAbortException
                 Throw ex
             Catch ex As Exception
                 Throw VbMakeException(ex, vbErrors.PathNotFound)
@@ -117,8 +115,6 @@ Namespace Microsoft.VisualBasic.CompilerServices
                         Throw ex
                     Catch ex As OutOfMemoryException
                         Throw ex
-                    Catch ex As System.Threading.ThreadAbortException
-                        Throw ex
                     Catch e As Exception
                     End Try
                 End If
@@ -128,6 +124,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         '======================================
         ' Input
         '======================================
+        <RequiresUnreferencedCode("Calls Conversion.ParseInputField")>
         Friend Overloads Overrides Sub Input(ByRef obj As Object)
             Dim lChar As Integer
             Dim sField As String

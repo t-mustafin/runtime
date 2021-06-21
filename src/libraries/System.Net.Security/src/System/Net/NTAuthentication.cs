@@ -4,11 +4,13 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Security;
+using System.Runtime.Versioning;
 using System.Security.Authentication.ExtendedProtection;
 
 namespace System.Net
 {
-    internal partial class NTAuthentication
+    [UnsupportedOSPlatform("tvos")]
+    internal sealed partial class NTAuthentication
     {
         internal string? AssociatedName
         {
@@ -20,7 +22,7 @@ namespace System.Net
                 }
 
                 string? name = NegotiateStreamPal.QueryContextAssociatedName(_securityContext!);
-                if (NetEventSource.IsEnabled) NetEventSource.Info(this, $"NTAuthentication: The context is associated with [{name}]");
+                if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, $"NTAuthentication: The context is associated with [{name}]");
                 return name;
             }
         }
@@ -86,7 +88,7 @@ namespace System.Net
             }
         }
 
-        private class InitializeCallbackContext
+        private sealed class InitializeCallbackContext
         {
             internal InitializeCallbackContext(NTAuthentication thisPtr, bool isServer, string package, NetworkCredential credential, string spn, ContextFlagsPal requestedContextFlags, ChannelBinding channelBinding)
             {

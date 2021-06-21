@@ -7,12 +7,13 @@ using System.Xml.Serialization;
 using System.Data.SqlTypes;
 using System.Diagnostics;
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data.Common
 {
     internal sealed class SqlCharsStorage : DataStorage
     {
-        private SqlChars[] _values;
+        private SqlChars[] _values = default!; // Late-initialized
 
         public SqlCharsStorage(DataColumn column)
         : base(column, typeof(SqlChars), SqlChars.Null, SqlChars.Null, StorageType.SqlChars)
@@ -25,12 +26,12 @@ namespace System.Data.Common
             {
                 switch (kind)
                 {
-                    case AggregateType.First:
+                    case AggregateType.First: // Does not seem to be implemented
                         if (records.Length > 0)
                         {
                             return _values[records[0]];
                         }
-                        return null; // no data => null
+                        return null!; // no data => null
 
                     case AggregateType.Count:
                         int count = 0;
@@ -55,7 +56,7 @@ namespace System.Data.Common
             return 0;
         }
 
-        public override int CompareValueTo(int recordNo, object value)
+        public override int CompareValueTo(int recordNo, object? value)
         {
             //            throw ExceptionBuilder.IComparableNotDefined;
             return 0;
@@ -98,6 +99,7 @@ namespace System.Data.Common
             _values = newValues;
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override object ConvertXmlToObject(string s)
         {
             SqlString newValue = default;
@@ -114,6 +116,7 @@ namespace System.Data.Common
             return (new SqlChars((SqlString)tmp));
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override string ConvertObjectToXml(object value)
         {
             Debug.Assert(!DataStorage.IsObjectNull(value), "we shouldn't have null here");

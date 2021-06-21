@@ -1,7 +1,6 @@
 /*
  * Licensed to the .NET Foundation under one or more agreements.
  * The .NET Foundation licenses this file to you under the MIT license.
- * See the LICENSE file in the project root for more information.
  */
 
 #ifndef __MONO_PROFILER_PRIVATE_H__
@@ -108,7 +107,6 @@ typedef struct {
 } MonoProfilerCoverageInfo;
 
 void mono_profiler_started (void);
-void mono_profiler_cleanup (void);
 
 static inline gboolean
 mono_profiler_installed (void)
@@ -158,6 +156,9 @@ mono_profiler_clauses_enabled (void)
 {
 	return mono_profiler_state.clauses;
 }
+
+MONO_COMPONENT_API gboolean
+mono_component_profiler_clauses_enabled (void);
 
 #define _MONO_PROFILER_EVENT(name, ...) \
 	ICALL_EXPORT void mono_profiler_raise_ ## name (__VA_ARGS__);

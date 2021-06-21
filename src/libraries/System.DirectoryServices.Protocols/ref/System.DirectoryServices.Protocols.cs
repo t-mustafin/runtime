@@ -372,6 +372,7 @@ namespace System.DirectoryServices.Protocols
         public bool RootDseCache { get { throw null; } set { } }
         public string SaslMethod { get { throw null; } set { } }
         public bool Sealing { get { throw null; } set { } }
+        [System.Runtime.Versioning.SupportedOSPlatformAttribute("windows")]
         public bool SecureSocketLayer { get { throw null; } set { } }
         public object SecurityContext { get { throw null; } }
         public System.TimeSpan SendTimeout { get { throw null; } set { } }
@@ -466,9 +467,10 @@ namespace System.DirectoryServices.Protocols
     }
     public delegate System.Security.Cryptography.X509Certificates.X509Certificate QueryClientCertificateCallback(System.DirectoryServices.Protocols.LdapConnection connection, byte[][] trustedCAs);
     public delegate System.DirectoryServices.Protocols.LdapConnection QueryForConnectionCallback(System.DirectoryServices.Protocols.LdapConnection primaryConnection, System.DirectoryServices.Protocols.LdapConnection referralFromConnection, string newDistinguishedName, System.DirectoryServices.Protocols.LdapDirectoryIdentifier identifier, System.Net.NetworkCredential credential, long currentUserToken);
+    [System.Runtime.Versioning.SupportedOSPlatformAttribute("windows")]
     public partial class QuotaControl : System.DirectoryServices.Protocols.DirectoryControl
     {
-        public QuotaControl() : base (default(string), default(byte[]), default(bool), default(bool)) { }
+        public QuotaControl() : base (default(string), default(byte[]), default(bool), default(bool)) { } 
         public QuotaControl(System.Security.Principal.SecurityIdentifier querySid) : base (default(string), default(byte[]), default(bool), default(bool)) { }
         public System.Security.Principal.SecurityIdentifier QuerySid { get { throw null; } set { } }
         public override byte[] GetValue() { throw null; }

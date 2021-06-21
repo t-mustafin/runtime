@@ -255,7 +255,7 @@ namespace System.Collections.Tests
         }
 
         [Fact]
-        public void EnsureCapacity_NewCapacityLessThanMin_CapsToMaxArrayLength()
+        public void EnsureCapacity_NewCapacityLessThanMin_CapsToArrayMaxLength()
         {
             // A situation like this occurs for very large lengths of SortedList.
             // To avoid allocating several GBs of memory and making this test run for a very
@@ -1339,14 +1339,7 @@ namespace System.Collections.Tests
 
             try
             {
-                var cultureNames = new string[]
-                {
-                    "cs-CZ","da-DK","de-DE","el-GR","en-US",
-                    "es-ES","fi-FI","fr-FR","hu-HU","it-IT",
-                    "ja-JP","ko-KR","nb-NO","nl-NL","pl-PL",
-                    "pt-BR","pt-PT","ru-RU","sv-SE","tr-TR",
-                    "zh-CN","zh-HK","zh-TW"
-                };
+                var cultureNames = Helpers.TestCultureNames;
 
                 var installedCultures = new CultureInfo[cultureNames.Length];
                 var cultureDisplayNames = new string[installedCultures.Length];
@@ -1544,7 +1537,7 @@ namespace System.Collections.Tests
         private SortedList _sortListGrandDaughter;
         private const int NumberOfElements = 100;
 
-        [Fact]
+        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsThreadingSupported))]
         [OuterLoop]
         public void GetSyncRootBasic()
         {

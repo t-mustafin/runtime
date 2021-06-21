@@ -7,12 +7,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Xml.Serialization;
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data.Common
 {
     internal sealed class SqlMoneyStorage : DataStorage
     {
-        private SqlMoney[] _values;
+        private SqlMoney[] _values = default!; // Late-initialized
 
         public SqlMoneyStorage(DataColumn column)
         : base(column, typeof(SqlMoney), SqlMoney.Null, SqlMoney.Null, StorageType.SqlMoney)
@@ -133,12 +134,12 @@ namespace System.Data.Common
                         }
                         return _nullValue;
 
-                    case AggregateType.First:
+                    case AggregateType.First: // Does not seem to be implemented
                         if (records.Length > 0)
                         {
                             return _values[records[0]];
                         }
-                        return null;
+                        return null!;
 
                     case AggregateType.Count:
                         count = 0;
@@ -162,12 +163,13 @@ namespace System.Data.Common
             return _values[recordNo1].CompareTo(_values[recordNo2]);
         }
 
-        public override int CompareValueTo(int recordNo, object value)
+        public override int CompareValueTo(int recordNo, object? value)
         {
+            Debug.Assert(null != value, "null value");
             return _values[recordNo].CompareTo((SqlMoney)value);
         }
 
-        public override object ConvertValue(object value)
+        public override object ConvertValue(object? value)
         {
             if (null != value)
             {
@@ -206,6 +208,7 @@ namespace System.Data.Common
             _values = newValues;
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override object ConvertXmlToObject(string s)
         {
             SqlMoney newValue = default;
@@ -221,6 +224,7 @@ namespace System.Data.Common
             return ((SqlMoney)tmp);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override string ConvertObjectToXml(object value)
         {
             Debug.Assert(!DataStorage.IsObjectNull(value), "we shouldn't have null here");

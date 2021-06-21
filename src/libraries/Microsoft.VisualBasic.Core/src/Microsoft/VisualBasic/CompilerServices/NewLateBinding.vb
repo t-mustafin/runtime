@@ -1,22 +1,15 @@
 ' Licensed to the .NET Foundation under one or more agreements.
 ' The .NET Foundation licenses this file to you under the MIT license.
-' See the LICENSE file in the project root for more information.
 
 Imports System
-Imports System.Collections
 Imports System.Collections.Generic
 Imports System.Diagnostics
 Imports System.Dynamic
-Imports System.Globalization
 Imports System.Reflection
-Imports System.Runtime.InteropServices
 
 Imports Microsoft.VisualBasic.CompilerServices.Symbols
 Imports Microsoft.VisualBasic.CompilerServices.OverloadResolution
-Imports Microsoft.VisualBasic.CompilerServices.ExceptionUtils
-Imports Microsoft.VisualBasic.CompilerServices.Utils
-Imports Microsoft.VisualBasic.CompilerServices.ReflectionExtensions
-Imports System.Runtime.Versioning
+Imports System.Diagnostics.CodeAnalysis
 
 #Const NEW_BINDER = True
 #Const BINDING_LOG = False
@@ -26,11 +19,13 @@ Namespace Microsoft.VisualBasic.CompilerServices
     ' Implements VB late binder.
     <ComponentModel.EditorBrowsable(ComponentModel.EditorBrowsableState.Never)>
     Public NotInheritable Class NewLateBinding
+        Private Const LateBindingTrimMessage As String = "Late binding is dynamic and cannot be statically analyzed. The referenced types and members may be trimmed"
         ' Prevent creation.
         Private Sub New()
         End Sub
 
         <DebuggerHiddenAttribute()> <DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Function LateCall(
                 ByVal Instance As Object,
                 ByVal Type As System.Type,
@@ -65,6 +60,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         <Obsolete("do not use this method", True)>
         <System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)>
         <DebuggerHiddenAttribute()> <DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Function FallbackCall(
                 ByVal Instance As Object,
                 ByVal MemberName As String,
@@ -77,6 +73,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Function
 
         <DebuggerHiddenAttribute()> <DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Private Shared Function ObjectLateCall(
                 ByVal instance As Object,
                 ByVal type As System.Type,
@@ -112,6 +109,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Function
 
         'Quick check to determine if FallbackCall will succeed
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Friend Shared Function CanBindCall(ByVal instance As Object, ByVal memberName As String, ByVal arguments As Object(), ByVal argumentNames As String(), ByVal ignoreReturn As Boolean) As Boolean
             Dim baseReference As New Container(instance)
             Dim invocationFlags As BindingFlags = BindingFlagsInvokeMethod Or BindingFlagsGetProperty
@@ -144,6 +142,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         ' Currently we can get here only in the process of execution of NewLateBinding.LateCall. 
         <System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)>
         <DebuggerHiddenAttribute()> <DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Function LateCallInvokeDefault(
                 ByVal Instance As Object,
                 ByVal Arguments As Object(),
@@ -159,6 +158,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         ' Currently we can get here only in the process of execution of NewLateBinding.LateGet. 
         <System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)>
         <DebuggerHiddenAttribute()> <DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Function LateGetInvokeDefault(
                 ByVal Instance As Object,
                 ByVal Arguments As Object(),
@@ -180,6 +180,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
             End If
         End Function
 
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Private Shared Function InternalLateInvokeDefault(
                 ByVal instance As Object,
                 ByVal arguments As Object(),
@@ -199,6 +200,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         <Obsolete("do not use this method", True)>
         <System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)>
         <DebuggerHiddenAttribute()> <DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Function FallbackInvokeDefault1(
                 ByVal Instance As Object,
                 ByVal Arguments As Object(),
@@ -213,6 +215,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         <Obsolete("do not use this method", True)>
         <System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)>
         <DebuggerHiddenAttribute()> <DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Function FallbackInvokeDefault2(
                 ByVal Instance As Object,
                 ByVal Arguments As Object(),
@@ -223,6 +226,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Function
 
         <DebuggerHiddenAttribute()> <DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Private Shared Function ObjectLateInvokeDefault(
                 ByVal instance As Object,
                 ByVal arguments As Object(),
@@ -240,6 +244,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Function
 
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Function LateIndexGet(
                 ByVal Instance As Object,
                 ByVal Arguments() As Object,
@@ -248,6 +253,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
             Return InternalLateInvokeDefault(Instance, Arguments, ArgumentNames, True, Nothing)
         End Function
 
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Private Shared Function LateIndexGet(
                 ByVal instance As Object,
                 ByVal arguments() As Object,
@@ -257,6 +263,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
             Return InternalLateInvokeDefault(instance, arguments, argumentNames, True, copyBack)
         End Function
 
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Private Shared Function InternalLateIndexGet(
                 ByVal instance As Object,
                 ByVal arguments() As Object,
@@ -307,6 +314,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
                        failure)
         End Function
 
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Friend Shared Function CanBindInvokeDefault(
                 ByVal instance As Object,
                 ByVal arguments As Object(),
@@ -343,6 +351,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Sub
 
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Function LateGet(
                 ByVal Instance As Object,
                 ByVal Type As System.Type,
@@ -377,6 +386,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         <Obsolete("do not use this method", True)>
         <System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)>
         <DebuggerHiddenAttribute()> <DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Function FallbackGet(
                 ByVal Instance As Object,
                 ByVal MemberName As String,
@@ -387,6 +397,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Function 'FallbackGet
 
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Private Shared Function ObjectLateGet(
                 ByVal instance As Object,
                 ByVal type As System.Type,
@@ -502,6 +513,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Function 'ObjectLateGet
 
         'Quick check to determine if FallbackGet will succeed
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Friend Shared Function CanBindGet(ByVal instance As Object, ByVal memberName As String, ByVal arguments As Object(), ByVal argumentNames As String()) As Boolean
             Dim baseReference As New Container(instance)
             Dim invocationFlags As BindingFlags = BindingFlagsInvokeMethod Or BindingFlagsGetProperty
@@ -570,6 +582,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Function
 
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Sub LateIndexSetComplex(
                 ByVal Instance As Object,
                 ByVal Arguments As Object(),
@@ -590,6 +603,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         <Obsolete("do not use this method", True)>
         <System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)>
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Sub FallbackIndexSetComplex(
                 ByVal Instance As Object,
                 ByVal Arguments As Object(),
@@ -601,6 +615,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Sub 'FallbackIndexSetComplex
 
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Friend Shared Sub ObjectLateIndexSetComplex(
                 ByVal instance As Object,
                 ByVal arguments As Object(),
@@ -694,6 +709,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
 
         'Determines if ObjectLateIndexSetComplex can succeed
         'Used by IDOBinder
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Friend Shared Function CanIndexSetComplex(
                 ByVal instance As Object,
                 ByVal arguments As Object(),
@@ -745,6 +761,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Function
 
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Sub LateIndexSet(
                 ByVal Instance As Object,
                 ByVal Arguments() As Object,
@@ -764,6 +781,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         <Obsolete("do not use this method", True)>
         <System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)>
         <DebuggerHiddenAttribute()> <DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Sub FallbackIndexSet(
                 ByVal Instance As Object,
                 ByVal Arguments() As Object,
@@ -773,6 +791,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Sub 'FallbackIndexSet
 
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Private Shared Sub ObjectLateIndexSet(
                 ByVal Instance As Object,
                 ByVal Arguments() As Object,
@@ -783,6 +802,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Sub 'ObjectLateIndexSet
 
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Sub LateSetComplex(
                 ByVal Instance As Object,
                 ByVal Type As Type,
@@ -807,6 +827,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         <Obsolete("do not use this method", True)>
         <System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)>
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Sub FallbackSetComplex(
                 ByVal Instance As Object,
                 ByVal MemberName As String,
@@ -815,11 +836,12 @@ Namespace Microsoft.VisualBasic.CompilerServices
                 ByVal RValueBase As Boolean)
 
             ObjectLateSetComplex(
-                Instance, Nothing, MemberName, Arguments, New String() {},
+                Instance, Nothing, MemberName, Arguments, Array.Empty(Of String)(),
                 NoTypeArguments, OptimisticSet, RValueBase)
         End Sub 'FallbackSetComplex
 
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Friend Shared Sub ObjectLateSetComplex(
                 ByVal instance As Object,
                 ByVal type As Type,
@@ -835,6 +857,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Sub
 
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Sub LateSet(
                 ByVal Instance As Object,
                 ByVal Type As Type,
@@ -856,6 +879,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         <Obsolete("do not use this method", True)>
         <System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)>
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Sub FallbackSet(
                 ByVal Instance As Object,
                 ByVal MemberName As String,
@@ -864,6 +888,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
             ObjectLateSet(Instance, Nothing, MemberName, Arguments, NoArgumentNames, NoTypeArguments)
         End Sub
 
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Friend Shared Sub ObjectLateSet(
                 ByVal instance As Object,
                 ByVal type As Type,
@@ -879,6 +904,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Sub
 
         <DebuggerHiddenAttribute(), DebuggerStepThroughAttribute()>
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Public Shared Sub LateSet(
                 ByVal Instance As Object,
                 ByVal Type As Type,
@@ -1046,6 +1072,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
         End Sub
 
         'Determines if LateSet will succeed. Used by IDOBinder.
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Friend Shared Function CanBindSet(ByVal instance As Object, ByVal memberName As String, ByVal value As Object, ByVal optimisticSet As Boolean, ByVal rValueBase As Boolean) As Boolean
             Dim baseReference As New Container(instance)
             Dim arguments As Object() = {value}
@@ -1113,6 +1140,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
             Return optimisticSet
         End Function
 
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Private Shared Function CallMethod(
                 ByVal baseReference As Container,
                 ByVal methodName As String,
@@ -1209,6 +1237,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
             End If
         End Function
 
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Friend Shared Function ResolveCall(
                 ByVal baseReference As Container,
                 ByVal methodName As String,
@@ -1414,6 +1443,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
             Return Nothing
         End Function
 
+        <RequiresUnreferencedCode(LateBindingTrimMessage)>
         Friend Shared Function ConstructCallArguments(
             ByVal targetProcedure As Method,
             ByVal arguments As Object(),

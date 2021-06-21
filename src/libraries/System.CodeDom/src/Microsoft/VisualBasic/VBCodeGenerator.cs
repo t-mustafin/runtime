@@ -865,7 +865,11 @@ namespace Microsoft.VisualBasic
                 string typeName = GetTypeOutput(e.CreateType);
                 Output.Write(typeName);
 
-                if (typeName.IndexOf('(') == -1) // string.Contains(char) is .NetCore2.1+ specific
+#if NETCOREAPP
+                if (!typeName.Contains('('))
+#else
+                if (typeName.IndexOf('(') == -1)
+#endif
                 {
                     Output.Write("()");
                 }
@@ -1271,8 +1275,8 @@ namespace Microsoft.VisualBasic
             GenerateVBStatements(e.TrueStatements);
             Indent--;
 
-            CodeStatementCollection falseStatemetns = e.FalseStatements;
-            if (falseStatemetns.Count > 0)
+            CodeStatementCollection falseStatements = e.FalseStatements;
+            if (falseStatements.Count > 0)
             {
                 Output.Write("Else");
                 Output.WriteLine();

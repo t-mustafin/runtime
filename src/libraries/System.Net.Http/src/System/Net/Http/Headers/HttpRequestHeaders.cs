@@ -35,16 +35,16 @@ namespace System.Net.Http.Headers
         }
 
         public HttpHeaderValueCollection<MediaTypeWithQualityHeaderValue> Accept =>
-            GetSpecializedCollection(AcceptSlot, thisRef => new HttpHeaderValueCollection<MediaTypeWithQualityHeaderValue>(KnownHeaders.Accept.Descriptor, thisRef));
+            GetSpecializedCollection(AcceptSlot, static thisRef => new HttpHeaderValueCollection<MediaTypeWithQualityHeaderValue>(KnownHeaders.Accept.Descriptor, thisRef));
 
         public HttpHeaderValueCollection<StringWithQualityHeaderValue> AcceptCharset =>
-            GetSpecializedCollection(AcceptCharsetSlot, thisRef => new HttpHeaderValueCollection<StringWithQualityHeaderValue>(KnownHeaders.AcceptCharset.Descriptor, thisRef));
+            GetSpecializedCollection(AcceptCharsetSlot, static thisRef => new HttpHeaderValueCollection<StringWithQualityHeaderValue>(KnownHeaders.AcceptCharset.Descriptor, thisRef));
 
         public HttpHeaderValueCollection<StringWithQualityHeaderValue> AcceptEncoding =>
-            GetSpecializedCollection(AcceptEncodingSlot, thisRef => new HttpHeaderValueCollection<StringWithQualityHeaderValue>(KnownHeaders.AcceptEncoding.Descriptor, thisRef));
+            GetSpecializedCollection(AcceptEncodingSlot, static thisRef => new HttpHeaderValueCollection<StringWithQualityHeaderValue>(KnownHeaders.AcceptEncoding.Descriptor, thisRef));
 
         public HttpHeaderValueCollection<StringWithQualityHeaderValue> AcceptLanguage =>
-            GetSpecializedCollection(AcceptLanguageSlot, thisRef => new HttpHeaderValueCollection<StringWithQualityHeaderValue>(KnownHeaders.AcceptLanguage.Descriptor, thisRef));
+            GetSpecializedCollection(AcceptLanguageSlot, static thisRef => new HttpHeaderValueCollection<StringWithQualityHeaderValue>(KnownHeaders.AcceptLanguage.Descriptor, thisRef));
 
         public AuthenticationHeaderValue? Authorization
         {
@@ -102,10 +102,6 @@ namespace System.Net.Http.Headers
                     value = null;
                 }
 
-                if ((value != null) && !HeaderUtilities.IsValidEmailAddress(value))
-                {
-                    throw new FormatException(SR.net_http_headers_invalid_from_header);
-                }
                 SetOrRemoveParsedValue(KnownHeaders.From.Descriptor, value);
             }
         }
@@ -130,7 +126,7 @@ namespace System.Net.Http.Headers
         }
 
         public HttpHeaderValueCollection<EntityTagHeaderValue> IfMatch =>
-            GetSpecializedCollection(IfMatchSlot, thisRef => new HttpHeaderValueCollection<EntityTagHeaderValue>(KnownHeaders.IfMatch.Descriptor, thisRef));
+            GetSpecializedCollection(IfMatchSlot, static thisRef => new HttpHeaderValueCollection<EntityTagHeaderValue>(KnownHeaders.IfMatch.Descriptor, thisRef));
 
         public DateTimeOffset? IfModifiedSince
         {
@@ -139,7 +135,7 @@ namespace System.Net.Http.Headers
         }
 
         public HttpHeaderValueCollection<EntityTagHeaderValue> IfNoneMatch =>
-            GetSpecializedCollection(IfNoneMatchSlot, thisRef => new HttpHeaderValueCollection<EntityTagHeaderValue>(KnownHeaders.IfNoneMatch.Descriptor, thisRef));
+            GetSpecializedCollection(IfNoneMatchSlot, static thisRef => new HttpHeaderValueCollection<EntityTagHeaderValue>(KnownHeaders.IfNoneMatch.Descriptor, thisRef));
 
         public RangeConditionHeaderValue? IfRange
         {
@@ -187,10 +183,10 @@ namespace System.Net.Http.Headers
         }
 
         public HttpHeaderValueCollection<TransferCodingWithQualityHeaderValue> TE =>
-            GetSpecializedCollection(TransferEncodingSlot, thisRef => new HttpHeaderValueCollection<TransferCodingWithQualityHeaderValue>(KnownHeaders.TE.Descriptor, thisRef));
+            GetSpecializedCollection(TransferEncodingSlot, static thisRef => new HttpHeaderValueCollection<TransferCodingWithQualityHeaderValue>(KnownHeaders.TE.Descriptor, thisRef));
 
         public HttpHeaderValueCollection<ProductInfoHeaderValue> UserAgent =>
-            GetSpecializedCollection(UserAgentSlot, thisRef => new HttpHeaderValueCollection<ProductInfoHeaderValue>(KnownHeaders.UserAgent.Descriptor, thisRef));
+            GetSpecializedCollection(UserAgentSlot, static thisRef => new HttpHeaderValueCollection<ProductInfoHeaderValue>(KnownHeaders.UserAgent.Descriptor, thisRef));
 
         private HttpHeaderValueCollection<NameValueWithParametersHeaderValue> ExpectCore =>
             _expect ??= new HttpHeaderValueCollection<NameValueWithParametersHeaderValue>(KnownHeaders.Expect.Descriptor, this, HeaderUtilities.ExpectContinue);
@@ -262,11 +258,6 @@ namespace System.Net.Http.Headers
 
         internal HttpRequestHeaders()
             : base(HttpHeaderType.General | HttpHeaderType.Request | HttpHeaderType.Custom, HttpHeaderType.Response)
-        {
-        }
-
-        internal HttpRequestHeaders(bool forceHeaderStoreItems)
-            : base(HttpHeaderType.General | HttpHeaderType.Request | HttpHeaderType.Custom, HttpHeaderType.Response, forceHeaderStoreItems)
         {
         }
 

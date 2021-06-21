@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
+using System.Runtime.Versioning;
 
 namespace System.IO.Pipes
 {
@@ -14,6 +15,218 @@ namespace System.IO.Pipes
     {
         internal const bool CheckOperationsRequiresSetHandle = true;
         internal ThreadPoolBoundHandle? _threadPoolBinding;
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_isAsync)
+            {
+                return ReadAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
+            }
+
+            ValidateBufferArguments(buffer, offset, count);
+            if (!CanRead)
+            {
+                throw Error.GetReadNotSupported();
+            }
+            CheckReadOperations();
+
+            return ReadCore(new Span<byte>(buffer, offset, count));
+        }
+
+        public override int Read(Span<byte> buffer)
+        {
+            if (_isAsync)
+            {
+                return base.Read(buffer);
+            }
+
+            if (!CanRead)
+            {
+                throw Error.GetReadNotSupported();
+            }
+            CheckReadOperations();
+
+            return ReadCore(buffer);
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            ValidateBufferArguments(buffer, offset, count);
+            if (!CanRead)
+            {
+                throw Error.GetReadNotSupported();
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<int>(cancellationToken);
+            }
+
+            CheckReadOperations();
+
+            if (!_isAsync)
+            {
+                return base.ReadAsync(buffer, offset, count, cancellationToken);
+            }
+
+            if (count == 0)
+            {
+                UpdateMessageCompletion(false);
+                return Task.FromResult(0);
+            }
+
+            return ReadAsyncCore(new Memory<byte>(buffer, offset, count), cancellationToken).AsTask();
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (!_isAsync)
+            {
+                return base.ReadAsync(buffer, cancellationToken);
+            }
+
+            if (!CanRead)
+            {
+                throw Error.GetReadNotSupported();
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return ValueTask.FromCanceled<int>(cancellationToken);
+            }
+
+            CheckReadOperations();
+
+            if (buffer.Length == 0)
+            {
+                UpdateMessageCompletion(false);
+                return new ValueTask<int>(0);
+            }
+
+            return ReadAsyncCore(buffer, cancellationToken);
+        }
+
+        public override IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback? callback, object? state)
+        {
+            if (_isAsync)
+                return TaskToApm.Begin(ReadAsync(buffer, offset, count, CancellationToken.None), callback, state);
+            else
+                return base.BeginRead(buffer, offset, count, callback, state);
+        }
+
+        public override int EndRead(IAsyncResult asyncResult)
+        {
+            if (_isAsync)
+                return TaskToApm.End<int>(asyncResult);
+            else
+                return base.EndRead(asyncResult);
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            if (_isAsync)
+            {
+                WriteAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
+                return;
+            }
+
+            ValidateBufferArguments(buffer, offset, count);
+            if (!CanWrite)
+            {
+                throw Error.GetWriteNotSupported();
+            }
+            CheckWriteOperations();
+
+            WriteCore(new ReadOnlySpan<byte>(buffer, offset, count));
+        }
+
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            if (_isAsync)
+            {
+                base.Write(buffer);
+                return;
+            }
+
+            if (!CanWrite)
+            {
+                throw Error.GetWriteNotSupported();
+            }
+            CheckWriteOperations();
+
+            WriteCore(buffer);
+        }
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            ValidateBufferArguments(buffer, offset, count);
+            if (!CanWrite)
+            {
+                throw Error.GetWriteNotSupported();
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<int>(cancellationToken);
+            }
+
+            CheckWriteOperations();
+
+            if (!_isAsync)
+            {
+                return base.WriteAsync(buffer, offset, count, cancellationToken);
+            }
+
+            if (count == 0)
+            {
+                return Task.CompletedTask;
+            }
+
+            return WriteAsyncCore(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken);
+        }
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (!_isAsync)
+            {
+                return base.WriteAsync(buffer, cancellationToken);
+            }
+
+            if (!CanWrite)
+            {
+                throw Error.GetWriteNotSupported();
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return ValueTask.FromCanceled(cancellationToken);
+            }
+
+            CheckWriteOperations();
+
+            if (buffer.Length == 0)
+            {
+                return default;
+            }
+
+            return new ValueTask(WriteAsyncCore(buffer, cancellationToken));
+        }
+
+        public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback? callback, object? state)
+        {
+            if (_isAsync)
+                return TaskToApm.Begin(WriteAsync(buffer, offset, count, CancellationToken.None), callback, state);
+            else
+                return base.BeginWrite(buffer, offset, count, callback, state);
+        }
+
+        public override void EndWrite(IAsyncResult asyncResult)
+        {
+            if (_isAsync)
+                TaskToApm.End(asyncResult);
+            else
+                base.EndWrite(asyncResult);
+        }
 
         internal static string GetPipePath(string serverName, string pipeName)
         {
@@ -178,6 +391,7 @@ namespace System.IO.Pipes
         }
 
         // Blocks until the other end of the pipe has read in all written buffer.
+        [SupportedOSPlatform("windows")]
         public void WaitForPipeDrain()
         {
             CheckWriteOperations();
@@ -189,7 +403,7 @@ namespace System.IO.Pipes
             // Block until other end of the pipe has read everything.
             if (!Interop.Kernel32.FlushFileBuffers(_handle!))
             {
-                throw WinIOError(Marshal.GetLastWin32Error());
+                throw WinIOError(Marshal.GetLastPInvokeError());
             }
         }
 
@@ -206,7 +420,7 @@ namespace System.IO.Pipes
                     uint pipeFlags;
                     if (!Interop.Kernel32.GetNamedPipeInfo(_handle!, &pipeFlags, null, null, null))
                     {
-                        throw WinIOError(Marshal.GetLastWin32Error());
+                        throw WinIOError(Marshal.GetLastPInvokeError());
                     }
                     if ((pipeFlags & Interop.Kernel32.PipeOptions.PIPE_TYPE_MESSAGE) != 0)
                     {
@@ -239,7 +453,7 @@ namespace System.IO.Pipes
                 uint inBufferSize;
                 if (!Interop.Kernel32.GetNamedPipeInfo(_handle!, null, null, &inBufferSize, null))
                 {
-                    throw WinIOError(Marshal.GetLastWin32Error());
+                    throw WinIOError(Marshal.GetLastPInvokeError());
                 }
 
                 return (int)inBufferSize;
@@ -269,7 +483,7 @@ namespace System.IO.Pipes
                 }
                 else if (!Interop.Kernel32.GetNamedPipeInfo(_handle!, null, &outBufferSize, null, null))
                 {
-                    throw WinIOError(Marshal.GetLastWin32Error());
+                    throw WinIOError(Marshal.GetLastPInvokeError());
                 }
 
                 return (int)outBufferSize;
@@ -305,7 +519,7 @@ namespace System.IO.Pipes
                     int pipeReadType = (int)value << 1;
                     if (!Interop.Kernel32.SetNamedPipeHandleState(_handle!, &pipeReadType, IntPtr.Zero, IntPtr.Zero))
                     {
-                        throw WinIOError(Marshal.GetLastWin32Error());
+                        throw WinIOError(Marshal.GetLastPInvokeError());
                     }
                     else
                     {
@@ -320,8 +534,7 @@ namespace System.IO.Pipes
             DebugAssertHandleValid(handle);
             Debug.Assert((_isAsync && overlapped != null) || (!_isAsync && overlapped == null), "Async IO parameter screwup in call to ReadFileNative.");
 
-            // You can't use the fixed statement on an array of length 0. Note that async callers
-            // check to avoid calling this first, so they can call user's callback
+            // Note that async callers check to avoid calling this first, so they can call user's callback.
             if (buffer.Length == 0)
             {
                 errorCode = 0;
@@ -341,7 +554,7 @@ namespace System.IO.Pipes
             if (r == 0)
             {
                 // In message mode, the ReadFile can inform us that there is more data to come.
-                errorCode = Marshal.GetLastWin32Error();
+                errorCode = Marshal.GetLastPInvokeError();
                 return errorCode == Interop.Errors.ERROR_MORE_DATA ?
                     numBytesRead :
                     -1;
@@ -358,8 +571,7 @@ namespace System.IO.Pipes
             DebugAssertHandleValid(handle);
             Debug.Assert((_isAsync && overlapped != null) || (!_isAsync && overlapped == null), "Async IO parameter screwup in call to WriteFileNative.");
 
-            // You can't use the fixed statement on an array of length 0. Note that async callers
-            // check to avoid calling this first, so they can call user's callback
+            // Note that async callers check to avoid calling this first, so they can call user's callback.
             if (buffer.Length == 0)
             {
                 errorCode = 0;
@@ -378,7 +590,7 @@ namespace System.IO.Pipes
 
             if (r == 0)
             {
-                errorCode = Marshal.GetLastWin32Error();
+                errorCode = Marshal.GetLastPInvokeError();
                 return -1;
             }
             else
@@ -426,7 +638,7 @@ namespace System.IO.Pipes
             uint flags;
             if (!Interop.Kernel32.GetNamedPipeHandleStateW(SafePipeHandle, &flags, null, null, null, null, 0))
             {
-                throw WinIOError(Marshal.GetLastWin32Error());
+                throw WinIOError(Marshal.GetLastPInvokeError());
             }
 
             if ((flags & Interop.Kernel32.PipeOptions.PIPE_READMODE_MESSAGE) != 0)

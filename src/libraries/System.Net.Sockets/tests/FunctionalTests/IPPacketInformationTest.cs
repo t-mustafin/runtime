@@ -24,6 +24,7 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50568", TestPlatforms.Android)]
         public void Equals_NonDefaultValue_Success()
         {
             IPPacketInformation packetInfo = GetNonDefaultIPPacketInformation();
@@ -41,6 +42,7 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50568", TestPlatforms.Android)]
         public void GetHashCode_NonDefaultValue_Succes()
         {
             IPPacketInformation packetInfo = GetNonDefaultIPPacketInformation();
@@ -70,10 +72,7 @@ namespace System.Net.Sockets.Tests
                 Assert.True(receiver.ReceiveMessageFromAsync(receiveArgs), "receiver.ReceiveMessageFromAsync");
 
                 // Send a few packets, in case they aren't delivered reliably.
-                for (int i = 0; i < TestSettings.UDPRedundancy; i++)
-                {
-                    sender.SendTo(new byte[1], new IPEndPoint(IPAddress.Loopback, port));
-                }
+                sender.SendTo(new byte[1], new IPEndPoint(IPAddress.Loopback, port));
 
                 Assert.True(waitHandle.WaitOne(ReceiveTimeout), "waitHandle.WaitOne");
 

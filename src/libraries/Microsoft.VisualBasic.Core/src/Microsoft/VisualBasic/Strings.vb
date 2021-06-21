@@ -1,8 +1,8 @@
 ' Licensed to the .NET Foundation under one or more agreements.
 ' The .NET Foundation licenses this file to you under the MIT license.
-' See the LICENSE file in the project root for more information.
 
 Imports System
+Imports System.Diagnostics.CodeAnalysis
 Imports System.Globalization
 Imports System.Runtime.Versioning
 Imports System.Text
@@ -304,8 +304,6 @@ Namespace Global.Microsoft.VisualBasic
                 Throw ex
             Catch ex As OutOfMemoryException
                 Throw ex
-            Catch ex As System.Threading.ThreadAbortException
-                Throw ex
             Catch
                 Throw New ArgumentException(SR.Format(SR.Argument_InvalidValueType2, NameOf(Source), "String"), NameOf(Source))
             End Try
@@ -489,8 +487,6 @@ EmptyMatchString:
                 Throw ex
             Catch ex As OutOfMemoryException
                 Throw ex
-            Catch ex As System.Threading.ThreadAbortException
-                Throw ex
             Catch
                 Throw New ArgumentException(SR.Format(SR.Argument_InvalidValueType2, "SourceArray", "String"))
             End Try
@@ -604,6 +600,7 @@ EmptyMatchString:
             Return Expression.Length
         End Function
 
+        <RequiresUnreferencedCode("The object's type cannot be statically analyzed and its members may be trimmed")>
         Public Function Len(ByVal Expression As Object) As Integer
             If Expression Is Nothing Then
                 Return 0
@@ -974,8 +971,6 @@ RedimAndExit:
                     Throw ex
                 Catch ex As OutOfMemoryException
                     Throw ex
-                Catch ex As System.Threading.ThreadAbortException
-                    Throw ex
                 Catch
                     Throw New ArgumentException(SR.Format(SR.Argument_InvalidValue1, "Character"))
                 End Try
@@ -1080,7 +1075,7 @@ RedimAndExit:
                     Select Case Style.Chars(0)
                         '(F)ixed
                         Case "f"c, "F"c
-                            If String.Compare(Style, NAMEDFORMAT_FIXED, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_FIXED, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CDbl(Expression).ToString("0.00", Nothing)
                                 Return True
                             End If
@@ -1092,13 +1087,13 @@ RedimAndExit:
                     '(O)n/off
                     Select Case Style.Chars(0)
                         Case "y"c, "Y"c
-                            If String.Compare(Style, NAMEDFORMAT_YES_NO, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_YES_NO, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CInt(CBool(Expression)).ToString(CachedYesNoFormatStyle, Nothing)
                                 Return True
                             End If
 
                         Case "o"c, "O"c
-                            If String.Compare(Style, NAMEDFORMAT_ON_OFF, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_ON_OFF, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CInt(CBool(Expression)).ToString(CachedOnOffFormatStyle, Nothing)
                                 Return True
                             End If
@@ -1109,7 +1104,7 @@ RedimAndExit:
                     '(P)ercent
                     Select Case Style.Chars(0)
                         Case "p"c, "P"c
-                            If String.Compare(Style, NAMEDFORMAT_PERCENT, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_PERCENT, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CDbl(Expression).ToString("0.00%", Nothing)
                                 Return True
                             End If
@@ -1122,12 +1117,12 @@ RedimAndExit:
 
                     Select Case Style.Chars(0)
                         Case "s"c, "S"c
-                            If String.Compare(Style, NAMEDFORMAT_STANDARD, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_STANDARD, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CDbl(Expression).ToString("N2", Nothing)
                                 Return True
                             End If
                         Case "c"c, "C"c
-                            If String.Compare(Style, NAMEDFORMAT_CURRENCY, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_CURRENCY, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CDbl(Expression).ToString("C", Nothing)
                                 Return True
                             End If
@@ -1140,13 +1135,13 @@ RedimAndExit:
 
                     Select Case Style.Chars(5)
                         Case "t"c, "T"c
-                            If String.Compare(Style, NAMEDFORMAT_LONG_TIME, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_LONG_TIME, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CDate(Expression).ToString("T", Nothing)
                                 Return True
                             End If
 
                         Case "d"c, "D"c
-                            If String.Compare(Style, NAMEDFORMAT_LONG_DATE, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_LONG_DATE, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CDate(Expression).ToString("D", Nothing)
                                 Return True
                             End If
@@ -1161,25 +1156,25 @@ RedimAndExit:
 
                     Select Case Style.Chars(6)
                         Case "a"c, "A"c
-                            If String.Compare(Style, NAMEDFORMAT_TRUE_FALSE, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_TRUE_FALSE, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CInt(CBool(Expression)).ToString(CachedTrueFalseFormatStyle, Nothing)
                                 Return True
                             End If
 
                         Case "t"c, "T"c
-                            If String.Compare(Style, NAMEDFORMAT_SHORT_TIME, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_SHORT_TIME, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CDate(Expression).ToString("t", Nothing)
                                 Return True
                             End If
 
                         Case "d"c, "D"c
-                            If String.Compare(Style, NAMEDFORMAT_SHORT_DATE, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_SHORT_DATE, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CDate(Expression).ToString("d", Nothing)
                                 Return True
                             End If
 
                         Case "i"c, "I"c
-                            If String.Compare(Style, NAMEDFORMAT_SCIENTIFIC, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_SCIENTIFIC, StringComparison.OrdinalIgnoreCase) Then
                                 Dim dbl As Double
                                 dbl = CDbl(Expression)
                                 If System.Double.IsNaN(dbl) OrElse System.Double.IsInfinity(dbl) Then
@@ -1199,13 +1194,13 @@ RedimAndExit:
 
                     Select Case Style.Chars(7)
                         Case "t"c, "T"c
-                            If String.Compare(Style, NAMEDFORMAT_MEDIUM_TIME, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_MEDIUM_TIME, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CDate(Expression).ToString("T", Nothing)
                                 Return True
                             End If
 
                         Case "d"c, "D"c
-                            If String.Compare(Style, NAMEDFORMAT_MEDIUM_DATE, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_MEDIUM_DATE, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CDate(Expression).ToString("D", Nothing)
                                 Return True
                             End If
@@ -1214,7 +1209,7 @@ RedimAndExit:
                 Case 12
                     Select Case Style.Chars(0)
                         Case "g"c, "G"c
-                            If String.Compare(Style, NAMEDFORMAT_GENERAL_DATE, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_GENERAL_DATE, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CDate(Expression).ToString("G", Nothing)
                                 Return True
                             End If
@@ -1223,7 +1218,7 @@ RedimAndExit:
                 Case 14
                     Select Case Style.Chars(0)
                         Case "g"c, "G"c
-                            If String.Compare(Style, NAMEDFORMAT_GENERAL_NUMBER, StringComparison.OrdinalIgnoreCase) = 0 Then
+                            If String.Equals(Style, NAMEDFORMAT_GENERAL_NUMBER, StringComparison.OrdinalIgnoreCase) Then
                                 ReturnValue = CDbl(Expression).ToString("G", Nothing)
                                 Return True
                             End If
@@ -1265,8 +1260,6 @@ RedimAndExit:
                     Catch ex As StackOverflowException
                         Throw ex
                     Catch ex As OutOfMemoryException
-                        Throw ex
-                    Catch ex As System.Threading.ThreadAbortException
                         Throw ex
                     Catch
                         'Object could not be converted to required type
@@ -2001,12 +1994,11 @@ RedimAndExit:
                 Throw ex
             Catch ex As OutOfMemoryException
                 Throw ex
-            Catch ex As System.Threading.ThreadAbortException
-                Throw ex
             Catch
             End Try
         End Function
 
+        <SupportedOSPlatform("windows")>
         Public Function StrConv(ByVal [str] As String, ByVal Conversion As VbStrConv, Optional ByVal LocaleID As Integer = 0) As String
 #If TARGET_WINDOWS Then
             Try
@@ -2026,8 +2018,6 @@ RedimAndExit:
                     Catch ex As StackOverflowException
                         Throw ex
                     Catch ex As OutOfMemoryException
-                        Throw ex
-                    Catch ex As System.Threading.ThreadAbortException
                         Throw ex
                     Catch
                         Throw New ArgumentException(SR.Format(SR.Argument_LCIDNotSupported1, CStr(LocaleID)))
@@ -2155,8 +2145,6 @@ RedimAndExit:
             Catch ex As StackOverflowException
                 Throw ex
             Catch ex As OutOfMemoryException
-                Throw ex
-            Catch ex As System.Threading.ThreadAbortException
                 Throw ex
             Catch
                 ValidLCID = False

@@ -3,7 +3,7 @@
 
 using System.Xml;
 using System.Collections;
-
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data.Common
 {
@@ -11,7 +11,7 @@ namespace System.Data.Common
     {
         private const long defaultValue = 0;
 
-        private long[] _values;
+        private long[] _values = default!; // Late-initialized
 
         internal Int64Storage(DataColumn column)
         : base(column, typeof(long), defaultValue, StorageType.Int64)
@@ -135,12 +135,12 @@ namespace System.Data.Common
                         }
                         return _nullValue;
 
-                    case AggregateType.First:
+                    case AggregateType.First: // Does not seem to be implemented
                         if (records.Length > 0)
                         {
                             return _values[records[0]];
                         }
-                        return null;
+                        return null!;
 
                     case AggregateType.Count:
                         return base.Aggregate(records, kind);
@@ -170,7 +170,7 @@ namespace System.Data.Common
             return (valueNo1 < valueNo2 ? -1 : (valueNo1 > valueNo2 ? 1 : 0)); // similar to Int64.CompareTo(Int64)
         }
 
-        public override int CompareValueTo(int recordNo, object value)
+        public override int CompareValueTo(int recordNo, object? value)
         {
             System.Diagnostics.Debug.Assert(0 <= recordNo, "Invalid record");
             System.Diagnostics.Debug.Assert(null != value, "null value");
@@ -189,7 +189,7 @@ namespace System.Data.Common
             //return(valueNo1 < valueNo2 ? -1 : (valueNo1 > valueNo2 ? 1 : 0)); // similar to Int64.CompareTo(Int64)
         }
 
-        public override object ConvertValue(object value)
+        public override object ConvertValue(object? value)
         {
             if (_nullValue != value)
             {
@@ -247,11 +247,13 @@ namespace System.Data.Common
             base.SetCapacity(capacity);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override object ConvertXmlToObject(string s)
         {
             return XmlConvert.ToInt64(s);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override string ConvertObjectToXml(object value)
         {
             return XmlConvert.ToString((long)value);

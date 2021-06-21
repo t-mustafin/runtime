@@ -24,6 +24,20 @@ namespace System
     [System.Runtime.CompilerServices.TypeForwardedFrom("mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")]
     public sealed partial class String : IComparable, IEnumerable, IConvertible, IEnumerable<char>, IComparable<string?>, IEquatable<string?>, ICloneable
     {
+        /// <summary>Maximum length allowed for a string.</summary>
+        /// <remarks>Keep in sync with AllocateString in gchelpers.cpp.</remarks>
+        internal const int MaxLength = 0x3FFFFFDF;
+
+#if !CORERT
+        // The Empty constant holds the empty string value. It is initialized by the EE during startup.
+        // It is treated as intrinsic by the JIT as so the static constructor would never run.
+        // Leaving it uninitialized would confuse debuggers.
+#pragma warning disable CS8618 // compiler sees this non-nullable static string as uninitialized
+        [Intrinsic]
+        public static readonly string Empty;
+#pragma warning restore CS8618
+#endif
+
         //
         // These fields map directly onto the fields in an EE StringObject.  See object.h for the layout.
         //
@@ -47,6 +61,8 @@ namespace System
         [MethodImpl(MethodImplOptions.InternalCall)]
         [DynamicDependency("Ctor(System.Char[])")]
         public extern String(char[]? value);
+
+#pragma warning disable CA1822 // Mark members as static
 
         private
 #if !CORECLR
@@ -356,6 +372,8 @@ namespace System
             return result;
         }
 
+#pragma warning restore CA1822
+
         public static string Create<TState>(int length, TState state, SpanAction<char, TState> action)
         {
             if (action == null)
@@ -395,7 +413,7 @@ namespace System
             }
 #endif
 
-            slice = new ReadOnlySpan<char>(ref Unsafe.Add(ref _firstChar, startIndex), count);
+            slice = new ReadOnlySpan<char>(ref Unsafe.Add(ref _firstChar, (nint)(uint)startIndex /* force zero-extension */), count);
             return true;
         }
 
@@ -443,6 +461,37 @@ namespace System
                 elementCount: (uint)count);
         }
 
+        /// <summary>Copies the contents of this string into the destination span.</summary>
+        /// <param name="destination">The span into which to copy this string's contents.</param>
+        /// <exception cref="System.ArgumentException">The destination span is shorter than the source string.</exception>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void CopyTo(Span<char> destination)
+        {
+            if ((uint)Length <= (uint)destination.Length)
+            {
+                Buffer.Memmove(ref destination._pointer.Value, ref _firstChar, (uint)Length);
+            }
+            else
+            {
+                ThrowHelper.ThrowArgumentException_DestinationTooShort();
+            }
+        }
+
+        /// <summary>Copies the contents of this string into the destination span.</summary>
+        /// <param name="destination">The span into which to copy this string's contents.</param>
+        /// <returns>true if the data was copied; false if the destination was too short to fit the contents of the string.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryCopyTo(Span<char> destination)
+        {
+            bool retVal = false;
+            if ((uint)Length <= (uint)destination.Length)
+            {
+                Buffer.Memmove(ref destination._pointer.Value, ref _firstChar, (uint)Length);
+                retVal = true;
+            }
+            return retVal;
+        }
+
         // Returns the entire string as an array of characters.
         public char[] ToCharArray()
         {
@@ -487,13 +536,9 @@ namespace System
         [NonVersionable]
         public static bool IsNullOrEmpty([NotNullWhen(false)] string? value)
         {
-            // Using 0u >= (uint)value.Length rather than
-            // value.Length == 0 as it will elide the bounds check to
-            // the first char: value[0] if that is performed following the test
-            // for the same test cost.
             // Ternary operator returning true/false prevents redundant asm generation:
             // https://github.com/dotnet/runtime/issues/4207
-            return (value == null || 0u >= (uint)value.Length) ? true : false;
+            return (value == null || 0 == value.Length) ? true : false;
         }
 
         public static bool IsNullOrWhiteSpace([NotNullWhen(false)] string? value)
@@ -563,12 +608,6 @@ namespace System
             return result;
         }
 
-        internal static unsafe void wstrcpy(char* dmem, char* smem, int charCount)
-        {
-            Buffer.Memmove((byte*)dmem, (byte*)smem, ((uint)charCount) * 2);
-        }
-
-
         // Returns this string.
         public override string ToString()
         {
@@ -611,6 +650,7 @@ namespace System
         internal static unsafe int wcslen(char* ptr)
         {
             // IndexOf processes memory in aligned chunks, and thus it won't crash even if it accesses memory beyond the null terminator.
+            // This IndexOf behavior is an implementation detail of the runtime and callers outside System.Private.CoreLib must not depend on it.
             int length = SpanHelpers.IndexOf(ref *ptr, '\0', int.MaxValue);
             if (length < 0)
             {
@@ -624,6 +664,7 @@ namespace System
         internal static unsafe int strlen(byte* ptr)
         {
             // IndexOf processes memory in aligned chunks, and thus it won't crash even if it accesses memory beyond the null terminator.
+            // This IndexOf behavior is an implementation detail of the runtime and callers outside System.Private.CoreLib must not depend on it.
             int length = SpanHelpers.IndexOf(ref *ptr, (byte)'\0', int.MaxValue);
             if (length < 0)
             {
@@ -769,6 +810,33 @@ namespace System
             {
                 return ASCIIUtility.GetIndexOfFirstNonAsciiChar(str, (uint)Length) == (uint)Length;
             }
+        }
+
+        // Gets the character at a specified position.
+        //
+        [IndexerName("Chars")]
+        public char this[int index]
+        {
+            [Intrinsic]
+            get
+            {
+                if ((uint)index >= (uint)_stringLength)
+                    ThrowHelper.ThrowIndexOutOfRangeException();
+                return Unsafe.Add(ref _firstChar, (nint)(uint)index /* force zero-extension */);
+            }
+        }
+
+        // Gets the length of this string
+        //
+        // This is an intrinsic function so that the JIT can recognise it specially
+        // and eliminate checks on character fetches in a loop like:
+        //        for(int i = 0; i < str.Length; i++) str[i]
+        // The actual code generated for this will be one instruction and will be inlined.
+        //
+        public int Length
+        {
+            [Intrinsic]
+            get => _stringLength;
         }
     }
 }

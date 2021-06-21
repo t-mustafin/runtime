@@ -15,7 +15,7 @@ namespace System
     /// An IEEE 754 compliant float16 type.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    public readonly struct Half : IComparable, IFormattable, IComparable<Half>, IEquatable<Half>, ISpanFormattable
+    public readonly struct Half : IComparable, ISpanFormattable, IComparable<Half>, IEquatable<Half>
     {
         private const NumberStyles DefaultParseStyle = NumberStyles.Float | NumberStyles.AllowThousands;
 
@@ -57,7 +57,7 @@ namespace System
 
         // Well-defined and commonly used values
 
-        public static Half Epsilon =>  new Half(EpsilonBits);                        //  5.9604645E-08
+        public static Half Epsilon => new Half(EpsilonBits);                        //  5.9604645E-08
 
         public static Half PositiveInfinity => new Half(PositiveInfinityBits);      //  1.0 / 0.0;
 
@@ -116,7 +116,7 @@ namespace System
                 // says they should be equal, even if the signs differ.
                 return leftIsNegative && !AreZero(left, right);
             }
-            return (short)(left._value) < (short)(right._value);
+            return (left._value < right._value) ^ leftIsNegative;
         }
 
         public static bool operator >(Half left, Half right)
@@ -141,7 +141,7 @@ namespace System
                 // says they should be equal, even if the signs differ.
                 return leftIsNegative || AreZero(left, right);
             }
-            return (short)(left._value) <= (short)(right._value);
+            return (left._value <= right._value) ^ leftIsNegative;
         }
 
         public static bool operator >=(Half left, Half right)
@@ -151,12 +151,19 @@ namespace System
 
         public static bool operator ==(Half left, Half right)
         {
-            return left.Equals(right);
+            if (IsNaN(left) || IsNaN(right))
+            {
+                // IEEE defines that NaN is not equal to anything, including itself.
+                return false;
+            }
+
+            // IEEE defines that positive and negative zero are equivalent.
+            return (left._value == right._value) || AreZero(left, right);
         }
 
         public static bool operator !=(Half left, Half right)
         {
-            return !(left.Equals(right));
+            return !(left == right);
         }
 
         /// <summary>Determines whether the specified value is finite (zero, subnormal, or normal).</summary>
@@ -405,7 +412,7 @@ namespace System
         /// <summary>
         /// Returns a value that indicates whether this instance is equal to a specified <paramref name="obj"/>.
         /// </summary>
-        public override bool Equals(object? obj)
+        public override bool Equals([NotNullWhen(true)] object? obj)
         {
             return (obj is Half other) && Equals(other);
         }
@@ -415,14 +422,9 @@ namespace System
         /// </summary>
         public bool Equals(Half other)
         {
-            if (IsNaN(this) || IsNaN(other))
-            {
-                // IEEE defines that NaN is not equal to anything, including itself.
-                return false;
-            }
-
-            // IEEE defines that positive and negative zero are equivalent.
-            return (_value == other._value) || AreZero(this, other);
+            return _value == other._value
+                || AreZero(this, other)
+                || (IsNaN(this) && IsNaN(other));
         }
 
         /// <summary>
@@ -489,7 +491,7 @@ namespace System
         {
             const int SingleMaxExponent = 0xFF;
 
-            uint floatInt = (uint)BitConverter.SingleToInt32Bits(value);
+            uint floatInt = BitConverter.SingleToUInt32Bits(value);
             bool sign = (floatInt & float.SignMask) >> float.SignShift != 0;
             int exp = (int)(floatInt & float.ExponentMask) >> float.ExponentShift;
             uint sig = floatInt & float.SignificandMask;
@@ -517,7 +519,7 @@ namespace System
         {
             const int DoubleMaxExponent = 0x7FF;
 
-            ulong doubleInt = (ulong)BitConverter.DoubleToInt64Bits(value);
+            ulong doubleInt = BitConverter.DoubleToUInt64Bits(value);
             bool sign = (doubleInt & double.SignMask) >> double.SignShift != 0;
             int exp = (int)((doubleInt & double.ExponentMask) >> double.ExponentShift);
             ulong sig = doubleInt & double.SignificandMask;
@@ -559,7 +561,7 @@ namespace System
             {
                 if (sig == 0)
                 {
-                    return BitConverter.Int32BitsToSingle((int)(sign ? float.SignMask : 0)); // Positive / Negative zero
+                    return BitConverter.UInt32BitsToSingle(sign ? float.SignMask : 0); // Positive / Negative zero
                 }
                 (exp, sig) = NormSubnormalF16Sig(sig);
                 exp -= 1;
@@ -587,7 +589,7 @@ namespace System
             {
                 if (sig == 0)
                 {
-                    return BitConverter.Int64BitsToDouble((long)(sign ? double.SignMask : 0)); // Positive / Negative zero
+                    return BitConverter.UInt64BitsToDouble(sign ? double.SignMask : 0); // Positive / Negative zero
                 }
                 (exp, sig) = NormSubnormalF16Sig(sig);
                 exp -= 1;
@@ -619,7 +621,7 @@ namespace System
             uint signInt = (sign ? 1U : 0U) << SignShift;
             uint sigInt = (uint)(significand >> 54);
 
-            return BitConverter.Int16BitsToHalf((short)(signInt | NaNBits | sigInt));
+            return BitConverter.UInt16BitsToHalf((ushort)(signInt | NaNBits | sigInt));
         }
 
         private static ushort RoundPackToHalf(bool sign, short exp, ushort sig)
@@ -633,6 +635,7 @@ namespace System
                 {
                     sig = (ushort)ShiftRightJam(sig, -exp);
                     exp = 0;
+                    roundBits = sig & 0xF;
                 }
                 else if (exp > 0x1D || sig + RoundIncrement >= 0x8000) // Overflow
                 {
@@ -667,7 +670,7 @@ namespace System
             uint signInt = (sign ? 1U : 0U) << float.SignShift;
             uint sigInt = (uint)(significand >> 41);
 
-            return BitConverter.Int32BitsToSingle((int)(signInt | NaNBits | sigInt));
+            return BitConverter.UInt32BitsToSingle(signInt | NaNBits | sigInt);
         }
 
         private static double CreateDoubleNaN(bool sign, ulong significand)
@@ -677,14 +680,14 @@ namespace System
             ulong signInt = (sign ? 1UL : 0UL) << double.SignShift;
             ulong sigInt = significand >> 12;
 
-            return BitConverter.Int64BitsToDouble((long)(signInt | NaNBits | sigInt));
+            return BitConverter.UInt64BitsToDouble(signInt | NaNBits | sigInt);
         }
 
         private static float CreateSingle(bool sign, byte exp, uint sig)
-            => BitConverter.Int32BitsToSingle((int)(((sign ? 1U : 0U) << float.SignShift) | ((uint)exp << float.ExponentShift) | sig));
+            => BitConverter.UInt32BitsToSingle(((sign ? 1U : 0U) << float.SignShift) + ((uint)exp << float.ExponentShift) + sig);
 
         private static double CreateDouble(bool sign, ushort exp, ulong sig)
-            => BitConverter.Int64BitsToDouble((long)(((sign ? 1UL : 0UL) << double.SignShift) | ((ulong)exp << double.ExponentShift) | sig));
+            => BitConverter.UInt64BitsToDouble(((sign ? 1UL : 0UL) << double.SignShift) + ((ulong)exp << double.ExponentShift) + sig);
 
         #endregion
     }

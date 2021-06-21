@@ -7,12 +7,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Xml.Serialization;
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data.Common
 {
     internal sealed class SqlStringStorage : DataStorage
     {
-        private SqlString[] _values;
+        private SqlString[] _values = default!; // Late-initialized
 
         public SqlStringStorage(DataColumn column)
         : base(column, typeof(SqlString), SqlString.Null, SqlString.Null, StorageType.SqlString)
@@ -109,12 +110,13 @@ namespace System.Data.Common
             return _table.Compare(valueNo1.Value, valueNo2.Value);
         }
 
-        public override int CompareValueTo(int recordNo, object value)
+        public override int CompareValueTo(int recordNo, object? value)
         {
+            Debug.Assert(null != value, "null value");
             return Compare(_values[recordNo], (SqlString)value);
         }
 
-        public override object ConvertValue(object value)
+        public override object ConvertValue(object? value)
         {
             if (null != value)
             {
@@ -159,6 +161,7 @@ namespace System.Data.Common
             _values = newValues;
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override object ConvertXmlToObject(string s)
         {
             SqlString newValue = default;
@@ -174,6 +177,7 @@ namespace System.Data.Common
             return ((SqlString)tmp);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override string ConvertObjectToXml(object value)
         {
             Debug.Assert(!DataStorage.IsObjectNull(value), "we shouldn't have null here");

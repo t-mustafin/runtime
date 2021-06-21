@@ -40,7 +40,6 @@ namespace System.Composition.UnitTests
         public class NotDiscoverable { }
 
         [Fact]
-        [ActiveIssue("https://github.com/dotnet/runtime/issues/23972", TargetFrameworkMonikers.NetFramework)]
         public void DiscoversCustomExportAttributes()
         {
             var container = CreateContainer(typeof(UnfairRule));
@@ -49,7 +48,6 @@ namespace System.Composition.UnitTests
         }
 
         [Fact]
-        [ActiveIssue("https://github.com/dotnet/runtime/issues/23972", TargetFrameworkMonikers.NetFramework)]
         public void DiscoversCustomExportAttributesUnderConventions()
         {
             var container = CreateContainer(new ConventionBuilder(), typeof(UnfairRule));
@@ -58,7 +56,7 @@ namespace System.Composition.UnitTests
         }
 
         [Fact]
-        [ActiveIssue("https://github.com/dotnet/runtime/issues/23972", TargetFrameworkMonikers.NetFramework)]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50919", TestPlatforms.Android)]
         public void InstanceExportsOfIncompatibleContractsAreDetected()
         {
             var x = Assert.Throws<CompositionFailedException>(() => CreateContainer(typeof(IncompatibleRule)));
@@ -66,7 +64,7 @@ namespace System.Composition.UnitTests
         }
 
         [Fact]
-        [ActiveIssue("https://github.com/dotnet/runtime/issues/23972", TargetFrameworkMonikers.NetFramework)]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50919", TestPlatforms.Android)]
         public void PropertyExportsOfIncompatibleContractsAreDetected()
         {
             var x = Assert.Throws<CompositionFailedException>(() => CreateContainer(typeof(IncompatibleRuleProperty)));
@@ -74,7 +72,6 @@ namespace System.Composition.UnitTests
         }
 
         [Fact]
-        [ActiveIssue("https://github.com/dotnet/runtime/issues/23972", TargetFrameworkMonikers.NetFramework)]
         public void ANonDiscoverablePartIsIgnored()
         {
             var container = CreateContainer(typeof(NotDiscoverable));
@@ -90,7 +87,6 @@ namespace System.Composition.UnitTests
         public class SpecialCloudBus : CloudBus { }
 
         [Fact]
-        [ActiveIssue("https://github.com/dotnet/runtime/issues/23972", TargetFrameworkMonikers.NetFramework)]
         public void DoesNotDiscoverExportAttributesFromBase()
         {
             var container = CreateContainer(typeof(SpecialCloudBus));
@@ -111,7 +107,6 @@ namespace System.Composition.UnitTests
         }
 
         [Fact]
-        [ActiveIssue("https://github.com/dotnet/runtime/issues/23972", TargetFrameworkMonikers.NetFramework)]
         public void SatisfiesImportsAppliedToBase()
         {
             var container = CreateContainer(typeof(HomeController), typeof(CloudBus));
@@ -129,7 +124,7 @@ namespace System.Composition.UnitTests
         }
 
         [Fact]
-        [ActiveIssue("https://github.com/dotnet/runtime/issues/23972", TargetFrameworkMonikers.NetFramework)]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/50919", TestPlatforms.Android)]
         public void MultipleImportAttributesAreDetected()
         {
             var c = new ContainerConfiguration()

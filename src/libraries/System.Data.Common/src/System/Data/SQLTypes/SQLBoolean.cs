@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Xml;
 using System.Xml.Schema;
 using System.Xml.Serialization;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data.SqlTypes
 {
@@ -193,7 +194,7 @@ namespace System.Data.SqlTypes
         {
             if (null == s)
                 // Let Boolean.Parse throw exception
-                return new SqlBoolean(bool.Parse(s));
+                return new SqlBoolean(bool.Parse(s!));
             if (s == SQLResource.NullString)
                 return SqlBoolean.Null;
 
@@ -438,7 +439,7 @@ namespace System.Data.SqlTypes
         // or a value greater than zero if this > object.
         // null is considered to be less than any instance.
         // If object is not of same type, this method throws an ArgumentException.
-        public int CompareTo(object value)
+        public int CompareTo(object? value)
         {
             if (value is SqlBoolean)
             {
@@ -446,7 +447,7 @@ namespace System.Data.SqlTypes
 
                 return CompareTo(i);
             }
-            throw ADP.WrongType(value.GetType(), typeof(SqlBoolean));
+            throw ADP.WrongType(value!.GetType(), typeof(SqlBoolean));
         }
 
         public int CompareTo(SqlBoolean value)
@@ -464,7 +465,7 @@ namespace System.Data.SqlTypes
         }
 
         // Compares this instance with a specified object
-        public override bool Equals(object value)
+        public override bool Equals([NotNullWhen(true)] object? value)
         {
             if (!(value is SqlBoolean))
             {
@@ -485,11 +486,11 @@ namespace System.Data.SqlTypes
             return IsNull ? 0 : Value.GetHashCode();
         }
 
-        XmlSchema IXmlSerializable.GetSchema() { return null; }
+        XmlSchema? IXmlSerializable.GetSchema() { return null; }
 
         void IXmlSerializable.ReadXml(XmlReader reader)
         {
-            string isNull = reader.GetAttribute("nil", XmlSchema.InstanceNamespace);
+            string? isNull = reader.GetAttribute("nil", XmlSchema.InstanceNamespace);
             if (isNull != null && XmlConvert.ToBoolean(isNull))
             {
                 // Read the next value.

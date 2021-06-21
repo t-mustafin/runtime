@@ -4,12 +4,13 @@
 using System.Numerics;
 using System.Collections;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data.Common
 {
     internal sealed class BigIntegerStorage : DataStorage
     {
-        private BigInteger[] _values;
+        private BigInteger[] _values = default!; // Late-initialized
 
         internal BigIntegerStorage(DataColumn column) :
             base(column, typeof(BigInteger), BigInteger.Zero, StorageType.BigInteger)
@@ -38,7 +39,7 @@ namespace System.Data.Common
             return valueNo1.CompareTo(valueNo2);
         }
 
-        public override int CompareValueTo(int recordNo, object value)
+        public override int CompareValueTo(int recordNo, object? value)
         {
             Debug.Assert(0 <= recordNo, "Invalid record");
             Debug.Assert(null != value, "null value");
@@ -91,7 +92,7 @@ namespace System.Data.Common
             else { throw ExceptionBuilder.ConvertFailed(typeof(System.Numerics.BigInteger), type); }
         }
 
-        public override object ConvertValue(object value)
+        public override object ConvertValue(object? value)
         {
             if (_nullValue != value)
             {
@@ -149,11 +150,13 @@ namespace System.Data.Common
             base.SetCapacity(capacity);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override object ConvertXmlToObject(string s)
         {
             return BigInteger.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override string ConvertObjectToXml(object value)
         {
             return ((BigInteger)value).ToString("D", System.Globalization.CultureInfo.InvariantCulture);

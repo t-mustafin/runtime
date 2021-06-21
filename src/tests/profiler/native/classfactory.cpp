@@ -2,12 +2,17 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 #include "classfactory.h"
-#include "gcbasicprofiler/gcbasicprofiler.h"
-#include "rejitprofiler/rejitprofiler.h"
+#include "eltprofiler/slowpatheltprofiler.h"
 #include "eventpipeprofiler/eventpipereadingprofiler.h"
 #include "eventpipeprofiler/eventpipewritingprofiler.h"
-#include "metadatagetdispenser/metadatagetdispenser.h"
 #include "getappdomainstaticaddress/getappdomainstaticaddress.h"
+#include "gcbasicprofiler/gcbasicprofiler.h"
+#include "gcprofiler/gcprofiler.h"
+#include "metadatagetdispenser/metadatagetdispenser.h"
+#include "nullprofiler/nullprofiler.h"
+#include "rejitprofiler/rejitprofiler.h"
+#include "releaseondetach/releaseondetach.h"
+#include "transitions/transitions.h"
 
 ClassFactory::ClassFactory(REFCLSID clsid) : refCount(0), clsid(clsid)
 {
@@ -61,7 +66,12 @@ HRESULT STDMETHODCALLTYPE ClassFactory::CreateInstance(IUnknown *pUnkOuter, REFI
         new EventPipeReadingProfiler(),
         new EventPipeWritingProfiler(),
         new MetaDataGetDispenser(),
-        new GetAppDomainStaticAddress()
+        new GetAppDomainStaticAddress(),
+        new SlowPathELTProfiler(),
+        new GCProfiler(),
+        new ReleaseOnDetach(),
+        new Transitions(),
+        new NullProfiler()
 		// add new profilers here
 	};
 

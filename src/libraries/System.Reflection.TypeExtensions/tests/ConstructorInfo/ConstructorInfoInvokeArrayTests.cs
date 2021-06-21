@@ -11,7 +11,7 @@ namespace System.Reflection.Tests
         public void Invoke_SZArrayConstructor()
         {
             Type type = Type.GetType("System.Object[]");
-            ConstructorInfo[] constructors = type.GetConstructors();
+            ConstructorInfo[] constructors = TypeExtensions.GetConstructors(type);
             Assert.Equal(1, constructors.Length);
 
             ConstructorInfo constructor = constructors[0];
@@ -36,11 +36,11 @@ namespace System.Reflection.Tests
         public void Invoke_1DArrayConstructor()
         {
             Type type = Type.GetType("System.Char[*]");
-            MethodInfo getLowerBound = type.GetMethod("GetLowerBound");
-            MethodInfo getUpperBound = type.GetMethod("GetUpperBound");
-            PropertyInfo getLength = type.GetProperty("Length");
+            MethodInfo getLowerBound = TypeExtensions.GetMethod(type, "GetLowerBound");
+            MethodInfo getUpperBound = TypeExtensions.GetMethod(type, "GetUpperBound");
+            PropertyInfo getLength = TypeExtensions.GetProperty(type, "Length");
 
-            ConstructorInfo[] constructors = type.GetConstructors();
+            ConstructorInfo[] constructors = TypeExtensions.GetConstructors(type);
             Assert.Equal(2, constructors.Length);
 
             for (int i = 0; i < constructors.Length; i++)
@@ -70,7 +70,7 @@ namespace System.Reflection.Tests
                             int[] invalidLowerBounds = new int[] { -20, 0, 20 };
                             if (!PlatformDetection.IsNonZeroLowerBoundArraySupported)
                             {
-                                Array.Clear(invalidLowerBounds, 0, invalidLowerBounds.Length);
+                                Array.Clear(invalidLowerBounds);
                             }
                             int[] invalidLengths = new int[] { -100, -9, -1 };
                             for (int j = 0; j < invalidLengths.Length; j++)
@@ -81,7 +81,7 @@ namespace System.Reflection.Tests
                             int[] validLowerBounds = new int[] { 0, 1, -1, 2, -3, 5, -10, 99, 100 };
                             if (!PlatformDetection.IsNonZeroLowerBoundArraySupported)
                             {
-                                Array.Clear(validLowerBounds, 0, validLowerBounds.Length);
+                                Array.Clear(validLowerBounds);
                             }
                             int[] validLengths = new int[] { 0, 1, 3, 2, 3, 5, 10, 99, 0 };
                             for (int j = 0; j < validLengths.Length; j++)
@@ -103,7 +103,7 @@ namespace System.Reflection.Tests
         {
             Type type = Type.GetType("System.Int32[,]", false);
 
-            ConstructorInfo[] constructors = type.GetConstructors();
+            ConstructorInfo[] constructors = TypeExtensions.GetConstructors(type);
             Assert.Equal(2, constructors.Length);
 
             for (int i = 0; i < constructors.Length; i++)
@@ -144,8 +144,8 @@ namespace System.Reflection.Tests
 
                             if (!PlatformDetection.IsNonZeroLowerBoundArraySupported)
                             {
-                                Array.Clear(invalidLowerBounds1, 0, invalidLowerBounds1.Length);
-                                Array.Clear(invalidLowerBounds2, 0, invalidLowerBounds2.Length);
+                                Array.Clear(invalidLowerBounds1);
+                                Array.Clear(invalidLowerBounds2);
                             }
 
                             for (int j = 0; j < invalidLengths3.Length; j++)
@@ -179,8 +179,8 @@ namespace System.Reflection.Tests
 
                             if (!PlatformDetection.IsNonZeroLowerBoundArraySupported)
                             {
-                                Array.Clear(validLowerBounds1, 0, validLowerBounds1.Length);
-                                Array.Clear(validLowerBounds2, 0, validLowerBounds2.Length);
+                                Array.Clear(validLowerBounds1);
+                                Array.Clear(validLowerBounds2);
                             }
 
                             for (int j = 0; j < validLengths1.Length; j++)
@@ -201,8 +201,8 @@ namespace System.Reflection.Tests
 
                             if (!PlatformDetection.IsNonZeroLowerBoundArraySupported)
                             {
-                                Array.Clear(validLowerBounds1, 0, validLowerBounds1.Length);
-                                Array.Clear(validLowerBounds2, 0, validLowerBounds2.Length);
+                                Array.Clear(validLowerBounds1);
+                                Array.Clear(validLowerBounds2);
                             }
 
                             for (int j = 0; j < validLengths1.Length; j++)
@@ -224,7 +224,7 @@ namespace System.Reflection.Tests
         public void Invoke_LargeDimensionalArrayConstructor()
         {
             Type type = Type.GetType("System.Type[,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,]");
-            ConstructorInfo[] cia = type.GetConstructors();
+            ConstructorInfo[] cia = TypeExtensions.GetConstructors(type);
             Assert.Equal(2, cia.Length);
             Assert.Throws<TypeLoadException>(() => Type.GetType("System.Type[,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,]"));
         }
@@ -233,7 +233,7 @@ namespace System.Reflection.Tests
         public void Invoke_JaggedArrayConstructor()
         {
             Type type = Type.GetType("System.String[][]");
-            ConstructorInfo[] constructors = type.GetConstructors();
+            ConstructorInfo[] constructors = TypeExtensions.GetConstructors(type);
             Assert.Equal(2, constructors.Length);
 
             for (int i = 0; i < constructors.Length; i++)

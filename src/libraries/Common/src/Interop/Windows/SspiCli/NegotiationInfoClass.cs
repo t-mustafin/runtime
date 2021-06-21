@@ -1,7 +1,6 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-#nullable enable
 using System.Runtime.InteropServices;
 
 namespace System.Net
@@ -14,7 +13,7 @@ namespace System.Net
         {
             if (safeHandle.IsInvalid)
             {
-                if (NetEventSource.IsEnabled) NetEventSource.Info(null, $"Invalid handle:{safeHandle}");
+                if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(null, $"Invalid handle:{safeHandle}");
                 return null;
             }
 
@@ -23,7 +22,7 @@ namespace System.Net
             {
                 safeHandle.DangerousAddRef(ref gotRef);
                 IntPtr packageInfo = safeHandle.DangerousGetHandle();
-                if (NetEventSource.IsEnabled) NetEventSource.Info(null, $"packageInfo:{packageInfo} negotiationState:{negotiationState:x}");
+                if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(null, $"packageInfo:{packageInfo} negotiationState:{negotiationState:x}");
 
                 if (negotiationState == Interop.SspiCli.SECPKG_NEGOTIATION_COMPLETE ||
                     negotiationState == Interop.SspiCli.SECPKG_NEGOTIATION_OPTIMISTIC)
@@ -34,7 +33,7 @@ namespace System.Net
                         name = Marshal.PtrToStringUni(((SecurityPackageInfo*)packageInfo)->Name);
                     }
 
-                    if (NetEventSource.IsEnabled) NetEventSource.Info(null, $"packageInfo:{packageInfo} negotiationState:{negotiationState:x} name:{name}");
+                    if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(null, $"packageInfo:{packageInfo} negotiationState:{negotiationState:x} name:{name}");
 
                     // An optimization for future string comparisons.
                     return

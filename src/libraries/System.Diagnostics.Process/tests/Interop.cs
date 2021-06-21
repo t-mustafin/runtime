@@ -8,7 +8,7 @@ using System.Security.Principal;
 
 namespace System.Diagnostics.Tests
 {
-    internal partial class Interop
+    internal static partial class Interop
     {
         [StructLayout(LayoutKind.Sequential, Size = 40)]
         public struct PROCESS_MEMORY_COUNTERS
@@ -55,9 +55,6 @@ namespace System.Diagnostics.Tests
         public static extern bool GetProcessWorkingSetSizeEx(SafeProcessHandle hProcess, out IntPtr lpMinimumWorkingSetSize, out IntPtr lpMaximumWorkingSetSize, out uint flags);
 
         [DllImport("kernel32.dll")]
-        internal static extern int GetCurrentProcessId();
-
-        [DllImport("kernel32.dll")]
         internal static extern bool ProcessIdToSessionId(uint dwProcessId, out uint pSessionId);
 
         [DllImport("kernel32.dll")]
@@ -78,7 +75,7 @@ namespace System.Diagnostics.Tests
         [DllImport("netapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         internal static extern uint NetUserAdd(string servername, uint level, ref USER_INFO_1 buf, out uint parm_err);
 
-        [DllImport("netapi32.dll")]
+        [DllImport("netapi32.dll", CharSet = CharSet.Unicode)]
         internal static extern uint NetUserDel(string servername, string username);
 
         [DllImport("advapi32.dll")]
@@ -86,6 +83,9 @@ namespace System.Diagnostics.Tests
 
         [DllImport("advapi32.dll")]
         internal static extern bool GetTokenInformation(SafeProcessHandle TokenHandle, uint TokenInformationClass, IntPtr TokenInformation, int TokenInformationLength, ref int ReturnLength);
+
+        [DllImport("shell32.dll")]
+        internal static extern int SHChangeNotify(int eventId, int flags, IntPtr item1, IntPtr item2);
 
         internal static void NetUserAdd(string username, string password)
         {
@@ -97,7 +97,7 @@ namespace System.Diagnostics.Tests
             uint parm_err;
             uint result = NetUserAdd(null, 1, ref userInfo, out parm_err);
 
-            if (result != 0) // NERR_Success
+            if (result != ExitCodes.NERR_Success)
             {
                 // most likely result == ERROR_ACCESS_DENIED
                 // due to running without elevated privileges
@@ -134,6 +134,12 @@ namespace System.Diagnostics.Tests
                 if (tu != IntPtr.Zero)
                     Marshal.FreeHGlobal(tu);
             }
+        }
+
+        internal static class ExitCodes
+        {
+            internal const uint NERR_Success = 0;
+            internal const uint NERR_UserNotFound = 2221;
         }
     }
 }

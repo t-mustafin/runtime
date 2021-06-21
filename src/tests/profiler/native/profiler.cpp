@@ -3,8 +3,18 @@
 
 #include "profiler.h"
 
+#include <thread>
+
+using std::thread;
+
+Profiler *Profiler::Instance = nullptr;
+
+std::atomic<bool> ShutdownGuard::s_preventHooks(false);
+std::atomic<int> ShutdownGuard::s_hooksInProgress(0);
+
 Profiler::Profiler() : refCount(0), pCorProfilerInfo(nullptr)
 {
+    Profiler::Instance = this;
 }
 
 Profiler::~Profiler()
@@ -18,15 +28,18 @@ Profiler::~Profiler()
 
 HRESULT STDMETHODCALLTYPE Profiler::Initialize(IUnknown *pICorProfilerInfoUnk)
 {
+    ShutdownGuard::Initialize();
+
     printf("Profiler.dll!Profiler::Initialize\n");
     fflush(stdout);
 
-    HRESULT queryInterfaceResult = pICorProfilerInfoUnk->QueryInterface(__uuidof(ICorProfilerInfo9), reinterpret_cast<void **>(&this->pCorProfilerInfo));
+    HRESULT queryInterfaceResult = pICorProfilerInfoUnk->QueryInterface(__uuidof(ICorProfilerInfo11), reinterpret_cast<void **>(&this->pCorProfilerInfo));
     if (FAILED(queryInterfaceResult))
     {
         printf("Profiler.dll!Profiler::Initialize failed to QI for ICorProfilerInfo.\n");
         pICorProfilerInfoUnk = NULL;
     }
+    
     return S_OK;
 }
 
@@ -34,6 +47,9 @@ HRESULT STDMETHODCALLTYPE Profiler::Shutdown()
 {
     printf("Profiler.dll!Profiler::Shutdown\n");
     fflush(stdout);
+
+    // Wait for any in progress profiler callbacks to finish.
+    ShutdownGuard::WaitForInProgressHooks();
 
     if (this->pCorProfilerInfo != nullptr)
     {
@@ -750,6 +766,34 @@ String Profiler::GetModuleIDName(ModuleID modId)
     }
 
     return moduleName;
+}
+
+void Profiler::SetCallback(ProfilerCallback cb)
+{
+    assert(cb != NULL);
+    callback = cb;
+    callbackSet.Signal();
+}
+
+void Profiler::NotifyManagedCodeViaCallback()
+{
+    callbackSet.Wait();
+
+    thread callbackThread([&]()
+    {
+        // The destructor will be called from the profiler detach thread, which causes
+        // some crst order asserts if we call back in to managed code. Spin up
+        // a new thread to avoid that.
+        pCorProfilerInfo->InitializeCurrentThread();
+        callback();
+    });
+
+    callbackThread.join();
+}
+
+extern "C" EXPORT void STDMETHODCALLTYPE PassCallbackToProfiler(ProfilerCallback callback)
+{
+    Profiler::Instance->SetCallback(callback);
 }
 
 #ifndef WIN32

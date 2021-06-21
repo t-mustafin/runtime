@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -112,7 +113,7 @@ namespace System.Threading.Channels.Tests
             Assert.False(t.IsCompleted);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsThreadingSupported))]
+        [Fact]
         public async Task DefaultWriteAsync_CatchesTryWriteExceptions()
         {
             var w = new TryWriteThrowingWriter<int>();
@@ -121,7 +122,7 @@ namespace System.Threading.Channels.Tests
             await Assert.ThrowsAsync<FormatException>(async () => await t);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsThreadingSupported))]
+        [Fact]
         public async Task DefaultReadAsync_CatchesTryWriteExceptions()
         {
             var r = new TryReadThrowingReader<int>();
@@ -130,7 +131,7 @@ namespace System.Threading.Channels.Tests
             await Assert.ThrowsAsync<FieldAccessException>(() => t);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsThreadingSupported))]
+        [Fact]
         public async Task TestBaseClassReadAsync()
         {
             WrapperChannel<int> channel = new WrapperChannel<int>(10);
@@ -162,6 +163,15 @@ namespace System.Threading.Channels.Tests
             readTask = reader.ReadAsync();
             channel.Writer.TryComplete();
             await Assert.ThrowsAsync<ChannelClosedException>(() => readTask.AsTask());
+        }
+
+        [Fact]
+        public void TestBaseClassTryPeek()
+        {
+            var reader = new TryPeekNoOverrideReader<int>();
+            Assert.False(reader.CanPeek);
+            Assert.False(reader.TryPeek(out int item));
+            Assert.Equal(0, item);
         }
 
         // This reader doesn't override ReadAsync to force using the base class ReadAsync method
@@ -216,7 +226,6 @@ namespace System.Threading.Channels.Tests
         {
             private Random _rand = new Random(42);
             private IEnumerator<T> _enumerator;
-            private int _count;
             private bool _closed;
 
             public TestChannelReader(IEnumerable<T> enumerable) => _enumerator = enumerable.GetEnumerator();
@@ -240,7 +249,6 @@ namespace System.Threading.Channels.Tests
                 }
 
                 // Otherwise return the next item.
-                _count++;
                 item = _enumerator.Current;
                 return true;
             }
@@ -261,6 +269,17 @@ namespace System.Threading.Channels.Tests
         {
             public override bool TryRead(out T item) => throw new FieldAccessException();
             public override ValueTask<bool> WaitToReadAsync(CancellationToken cancellationToken = default) => throw new DriveNotFoundException();
+        }
+
+        private sealed class TryPeekNoOverrideReader<T> : ChannelReader<T>
+        {
+            public override bool TryRead([MaybeNullWhen(false)] out T item)
+            {
+                item = default;
+                return false;
+            }
+
+            public override ValueTask<bool> WaitToReadAsync(CancellationToken cancellationToken) => default;
         }
 
         private sealed class CanReadFalseStream : MemoryStream

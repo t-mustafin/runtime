@@ -14,6 +14,7 @@ using System.Threading;
 using System.Numerics;
 using System.Reflection;
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data
 {
@@ -23,21 +24,25 @@ namespace System.Data
     [ToolboxItem(false)]
     [DesignTimeVisible(false)]
     [DefaultProperty(nameof(ColumnName))]
+    [Editor("Microsoft.VSDesigner.Data.Design.DataColumnEditor, Microsoft.VSDesigner, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+            "System.Drawing.Design.UITypeEditor, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a")]
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] // needed by Clone() to preserve derived ctors
     public class DataColumn : MarshalByValueComponent
     {
         private bool _allowNull = true;
-        private string _caption;
+        private string? _caption;
         private string _columnName;
-        private Type _dataType;
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicFields)]
+        private Type _dataType = null!; // Always set in UpdateColumnType
         private StorageType _storageType;
         internal object _defaultValue = DBNull.Value; // DefaultValue Converter
         private DataSetDateTime _dateTimeMode = DataSetDateTime.UnspecifiedLocal;
-        private DataExpression _expression;
+        private DataExpression? _expression;
         private int _maxLength = -1;
         private int _ordinal = -1;
         private bool _readOnly;
-        internal Index _sortIndex;
-        internal DataTable _table;
+        internal Index? _sortIndex;
+        internal DataTable? _table;
         private bool _unique;
         internal MappingType _columnMapping = MappingType.Element;
         internal int _hashCode;
@@ -51,20 +56,20 @@ namespace System.Data
 
         private bool _defaultValueIsNull = true;
 
-        internal List<DataColumn> _dependentColumns; // list of columns whose expression consume values from this column
-        internal PropertyCollection _extendedProperties;
+        internal List<DataColumn>? _dependentColumns; // list of columns whose expression consume values from this column
+        internal PropertyCollection? _extendedProperties;
 
-        private DataStorage _storage;
+        private DataStorage? _storage;
 
         /// <summary>represents current value to return, usage pattern is .get_Current then MoveAfter</summary>
-        private AutoIncrementValue _autoInc;
+        private AutoIncrementValue? _autoInc;
 
         // The _columnClass member is the class for the unfoliated virtual nodes in the XML.
-        internal string _columnUri;
+        internal string? _columnUri;
         private string _columnPrefix = string.Empty;
-        internal string _encodedColumnName;
+        internal string? _encodedColumnName;
 
-        internal SimpleType _simpleType;
+        internal SimpleType? _simpleType;
 
         private static int s_objectTypeCount;
         private readonly int _objectID = Interlocked.Increment(ref s_objectTypeCount);
@@ -73,6 +78,8 @@ namespace System.Data
         /// Initializes a new instance of a <see cref='System.Data.DataColumn'/>
         /// class.
         /// </summary>
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
+            Justification = "This is safe because type is string and expression is null.")]
         public DataColumn() : this(null, typeof(string), null, MappingType.Element)
         {
         }
@@ -81,7 +88,9 @@ namespace System.Data
         /// Initializes a new instance of the <see cref='System.Data.DataColumn'/> class
         /// using the specified column name.
         /// </summary>
-        public DataColumn(string columnName) : this(columnName, typeof(string), null, MappingType.Element)
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
+            Justification = "This is safe because type is string and expression is null.")]
+        public DataColumn(string? columnName) : this(columnName, typeof(string), null, MappingType.Element)
         {
         }
 
@@ -89,7 +98,9 @@ namespace System.Data
         /// Initializes a new instance of the <see cref='System.Data.DataColumn'/> class
         /// using the specified column name and data type.
         /// </summary>
-        public DataColumn(string columnName, Type dataType) : this(columnName, dataType, null, MappingType.Element)
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
+            Justification = "Expression is null and `dataType` is marked appropriately.")]
+        public DataColumn(string? columnName, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicFields)] Type dataType) : this(columnName, dataType, null, MappingType.Element)
         {
         }
 
@@ -98,7 +109,8 @@ namespace System.Data
         /// of the <see cref='System.Data.DataColumn'/> class
         /// using the specified name, data type, and expression.
         /// </summary>
-        public DataColumn(string columnName, Type dataType, string expr) : this(columnName, dataType, expr, MappingType.Element)
+        [RequiresUnreferencedCode("Members from serialized types or types used in expressions may be trimmed if not referenced directly.")]
+        public DataColumn(string? columnName, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicFields)] Type dataType, string? expr) : this(columnName, dataType, expr, MappingType.Element)
         {
         }
 
@@ -108,7 +120,8 @@ namespace System.Data
         /// the specified name, data type, expression, and value that determines whether the
         /// column is an attribute.
         /// </summary>
-        public DataColumn(string columnName, Type dataType, string expr, MappingType type)
+        [RequiresUnreferencedCode("Members from serialized types or types used in expressions may be trimmed if not referenced directly.")]
+        public DataColumn(string? columnName, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicFields)] Type dataType, string? expr, MappingType type)
         {
             GC.SuppressFinalize(this);
             DataCommonEventSource.Log.Trace("<ds.DataColumn.DataColumn|API> {0}, columnName='{1}', expr='{2}', type={3}", ObjectID, columnName, expr, type);
@@ -125,7 +138,7 @@ namespace System.Data
             }
             _columnName = columnName ?? string.Empty;
 
-            SimpleType stype = SimpleType.CreateSimpleType(typeCode, dataType);
+            SimpleType? stype = SimpleType.CreateSimpleType(typeCode, dataType);
             if (null != stype)
             {
                 SimpleType = stype;
@@ -140,8 +153,9 @@ namespace System.Data
             _columnMapping = type;
         }
 
-        private void UpdateColumnType(Type type, StorageType typeCode)
+        private void UpdateColumnType([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicFields)] Type type, StorageType typeCode)
         {
+            TypeLimiter.EnsureTypeIsAllowed(type);
             _dataType = type;
             _storageType = typeCode;
             if (StorageType.DateTime != typeCode)
@@ -298,6 +312,7 @@ namespace System.Data
         /// Gets or sets
         /// the caption for this column.
         /// </summary>
+        [AllowNull]
         public string Caption
         {
             get { return (_caption != null) ? _caption : _columnName; }
@@ -337,6 +352,7 @@ namespace System.Data
         /// </summary>
         [RefreshProperties(RefreshProperties.All)]
         [DefaultValue("")]
+        [AllowNull]
         public string ColumnName
         {
             get { return _columnName; }
@@ -417,6 +433,7 @@ namespace System.Data
         internal int ObjectID => _objectID;
 
         [DefaultValue("")]
+        [AllowNull]
         public string Prefix
         {
             get { return _columnPrefix; }
@@ -442,7 +459,8 @@ namespace System.Data
         // If the column type is string and it's value is empty, then the empty string is returned.
         // If the column type is not string, or the column type is string and the value is not empty string, then a non-empty string is returned
         // This method does not throw any formatting exceptions, since we can always format the field value to a string.
-        internal string GetColumnValueAsString(DataRow row, DataRowVersion version)
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
+        internal string? GetColumnValueAsString(DataRow row, DataRowVersion version)
         {
             object objValue = this[row.GetRecordFromVersion(version)];
 
@@ -464,7 +482,7 @@ namespace System.Data
         /// <summary>
         /// The internal expression object that computes the values.
         /// </summary>
-        internal DataExpression DataExpression => _expression;
+        internal DataExpression? DataExpression => _expression;
 
         /// <summary>
         /// The type of data stored in the column.
@@ -472,6 +490,8 @@ namespace System.Data
         [DefaultValue(typeof(string))]
         [RefreshProperties(RefreshProperties.All)]
         [TypeConverter(typeof(ColumnTypeConverter))]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicFields)]
+        [AllowNull]
         public Type DataType
         {
             get { return _dataType; }
@@ -517,7 +537,7 @@ namespace System.Data
                             else if (typeof(string) == value)
                             {
                                 // since string types can be null in value! DO NOT REMOVE THIS CHECK
-                                _defaultValue = DefaultValue.ToString();
+                                _defaultValue = DefaultValue.ToString()!;
                             }
                             else if (typeof(SqlString) == value)
                             {
@@ -572,7 +592,7 @@ namespace System.Data
                             AutoInc.Auto = inc.Auto; // recreate with correct datatype
                             AutoInc.Seed = inc.Seed;
                             AutoInc.Step = inc.Step;
-                            if (_autoInc.DataType == inc.DataType)
+                            if (_autoInc!.DataType == inc.DataType)
                             {
                                 _autoInc.Current = inc.Current;
                             }
@@ -636,6 +656,7 @@ namespace System.Data
         /// Gets or sets the default value for the column when creating new rows.
         /// </summary>
         [TypeConverter(typeof(DefaultValueTypeConverter))]
+        [AllowNull]
         public object DefaultValue
         {
             get
@@ -654,10 +675,10 @@ namespace System.Data
                     }
                     else if (_implementsINullable)
                     {
-                        PropertyInfo propInfo = _dataType.GetProperty("Null", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                        PropertyInfo propInfo = _dataType.GetProperty("Null", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
                         if (propInfo != null)
                         {
-                            _defaultValue = propInfo.GetValue(null, null);
+                            _defaultValue = propInfo.GetValue(null, null)!;
                         }
                     }
                 }
@@ -695,7 +716,7 @@ namespace System.Data
 
         internal bool DefaultValueIsNull => _defaultValueIsNull;
 
-        internal void BindExpression() => DataExpression.Bind(_table);
+        internal void BindExpression() => DataExpression!.Bind(_table);
 
         /// <summary>
         /// Gets or sets the expression used to either filter rows, calculate the column's
@@ -703,9 +724,11 @@ namespace System.Data
         /// </summary>
         [RefreshProperties(RefreshProperties.All)]
         [DefaultValue("")]
+        [AllowNull]
         public string Expression
         {
             get { return (_expression == null ? "" : _expression.Expression); }
+            [RequiresUnreferencedCode("Members from types used in the expressions may be trimmed if not referenced directly.")]
             set
             {
                 long logScopeId = DataCommonEventSource.Log.EnterScope("<ds.DataColumn.set_Expression|API> {0}, '{1}'", ObjectID, value);
@@ -717,7 +740,7 @@ namespace System.Data
 
                 try
                 {
-                    DataExpression newExpression = null;
+                    DataExpression? newExpression = null;
                     if (value.Length > 0)
                     {
                         DataExpression testExpression = new DataExpression(_table, value, _dataType);
@@ -769,7 +792,7 @@ namespace System.Data
 
                         HandleDependentColumnList(_expression, newExpression);
                         //hold onto oldExpression in case of error applying new Expression.
-                        DataExpression oldExpression = _expression;
+                        DataExpression? oldExpression = _expression;
                         _expression = newExpression;
 
                         // because the column is attached to a table we need to re-calc values
@@ -948,6 +971,7 @@ namespace System.Data
             }
         }
 
+        [AllowNull]
         public string Namespace
         {
             get
@@ -1002,7 +1026,7 @@ namespace System.Data
 
             if (_ordinal != ordinal)
             {
-                _table.Columns.MoveTo(this, ordinal);
+                _table!.Columns.MoveTo(this, ordinal);
             }
         }
 
@@ -1012,7 +1036,7 @@ namespace System.Data
             {
                 if (Unique && _ordinal != -1 && ordinal == -1)
                 {
-                    UniqueConstraint key = _table.Constraints.FindKeyConstraint(this);
+                    UniqueConstraint? key = _table!.Constraints.FindKeyConstraint(this);
                     if (key != null)
                     {
                         _table.Constraints.Remove(key);
@@ -1034,7 +1058,7 @@ namespace System.Data
                     if (Unique)
                     {
                         UniqueConstraint key = new UniqueConstraint(this);
-                        _table.Constraints.Add(key);
+                        _table!.Constraints.Add(key);
                     }
                 }
             }
@@ -1070,7 +1094,7 @@ namespace System.Data
                 if (_sortIndex == null)
                 {
                     var indexDesc = new IndexField[] { new IndexField(this, false) };
-                    _sortIndex = _table.GetIndex(indexDesc, DataViewRowState.CurrentRows, null);
+                    _sortIndex = _table!.GetIndex(indexDesc, DataViewRowState.CurrentRows, null);
                     _sortIndex.AddRef();
                 }
                 return _sortIndex;
@@ -1082,13 +1106,14 @@ namespace System.Data
         /// </summary>
         [Browsable(false)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-        public DataTable Table => _table;
+        public DataTable? Table => _table;
 
         /// <summary>
         /// Internal mechanism for changing the table pointer.
         /// </summary>
-        internal void SetTable(DataTable table)
+        internal void SetTable(DataTable? table)
         {
+            Debug.Assert(table != null || !Unique);
             if (_table != table)
             {
                 if (Computed)
@@ -1096,13 +1121,13 @@ namespace System.Data
                     if ((table == null) || (!table.fInitInProgress && ((table.DataSet == null) || (!table.DataSet._fIsSchemaLoading && !table.DataSet._fInitInProgress))))
                     {
                         // We need to re-bind all expression columns.
-                        DataExpression.Bind(table);
+                        DataExpression!.Bind(table);
                     }
                 }
 
                 if (Unique && _table != null)
                 {
-                    UniqueConstraint constraint = table.Constraints.FindKeyConstraint(this);
+                    UniqueConstraint? constraint = table!.Constraints.FindKeyConstraint(this);
                     if (constraint != null)
                     {
                         table.Constraints.CanRemove(constraint, true);
@@ -1113,7 +1138,7 @@ namespace System.Data
             }
         }
 
-        private DataRow GetDataRow(int index) => _table._recordManager[index];
+        private DataRow GetDataRow(int index) => _table!._recordManager[index];
 
         /// <summary>
         /// This is how data is pushed in and out of the column.
@@ -1122,7 +1147,7 @@ namespace System.Data
         {
             get
             {
-                _table._recordManager.VerifyRecord(record);
+                _table!._recordManager.VerifyRecord(record);
                 Debug.Assert(null != _storage, "null storage");
                 return _storage.Get(record);
             }
@@ -1130,7 +1155,7 @@ namespace System.Data
             {
                 try
                 {
-                    _table._recordManager.VerifyRecord(record);
+                    _table!._recordManager.VerifyRecord(record);
                     Debug.Assert(null != _storage, "no storage");
                     Debug.Assert(null != value, "setting null, expecting dbnull");
                     _storage.Set(record, value);
@@ -1181,7 +1206,7 @@ namespace System.Data
             catch (Exception e)
             {
                 ExceptionBuilder.TraceExceptionForCapture(e);
-                throw ExceptionBuilder.SetFailed(value, this, DataType, e);
+                throw ExceptionBuilder.SetFailed(value!, this, DataType, e);
             }
 
             DataRow dr = GetDataRow(record);
@@ -1217,7 +1242,7 @@ namespace System.Data
                             throw ExceptionBuilder.UniqueAndExpression();
                         }
 
-                        UniqueConstraint oldConstraint = null;
+                        UniqueConstraint? oldConstraint = null;
                         if (_table != null)
                         {
                             if (value)
@@ -1226,9 +1251,9 @@ namespace System.Data
                             }
                             else
                             {
-                                for (IEnumerator e = Table.Constraints.GetEnumerator(); e.MoveNext();)
+                                for (IEnumerator e = _table.Constraints.GetEnumerator(); e.MoveNext();)
                                 {
-                                    UniqueConstraint o = (e.Current as UniqueConstraint);
+                                    UniqueConstraint? o = (e.Current as UniqueConstraint);
                                     if ((null != o) && (o.ColumnsReference.Length == 1) && (o.ColumnsReference[0] == this))
                                         oldConstraint = o;
                                 }
@@ -1252,7 +1277,7 @@ namespace System.Data
                             }
                             else
                             {
-                                _table.Constraints.Remove(oldConstraint);
+                                _table.Constraints.Remove(oldConstraint!);
                             }
                         }
                     }
@@ -1267,9 +1292,9 @@ namespace System.Data
 
         internal void InternalUnique(bool value) => _unique = value;
 
-        internal string XmlDataType { get; set; } = string.Empty; // The type specified in dt:type attribute
+        internal string? XmlDataType { get; set; } = string.Empty; // The type specified in dt:type attribute
 
-        internal SimpleType SimpleType
+        internal SimpleType? SimpleType
         {
             get { return _simpleType; }
             set
@@ -1279,7 +1304,7 @@ namespace System.Data
                 // there is a change, since we are supporting hierarchy(bacause of Names Simple Type) old check (just one leel base check) is wrong
                 if (value != null && value.CanHaveMaxLength())
                 {
-                    _maxLength = _simpleType.MaxLength; // this is temp solution, since we dont let simple content to have
+                    _maxLength = value.MaxLength; // this is temp solution, since we dont let simple content to have
                 }
 
                 //maxlength set but for simple type we want to set it, after coming to decision about it , we should
@@ -1354,11 +1379,11 @@ namespace System.Data
             }
         }
 
-        internal event PropertyChangedEventHandler PropertyChanging;
+        internal event PropertyChangedEventHandler? PropertyChanging;
 
         internal void CheckColumnConstraint(DataRow row, DataRowAction action)
         {
-            if (_table.UpdatingCurrent(row, action))
+            if (_table!.UpdatingCurrent(row, action))
             {
                 CheckNullable(row);
                 CheckMaxLength(row);
@@ -1415,7 +1440,7 @@ namespace System.Data
             else
             {
                 // since we do not have index, we so sequential search
-                foreach (DataRow dr in _table.Rows)
+                foreach (DataRow dr in _table!.Rows)
                 {
                     if (dr.RowState == DataRowState.Deleted)
                     {
@@ -1477,7 +1502,7 @@ namespace System.Data
             if (valuesMatch == 0)
             {
                 Type leftType = value.GetType();
-                Type rightType = _storage.Get(record1).GetType();
+                Type rightType = _storage!.Get(record1).GetType();
                 // if strings, then do exact character by character check
                 if (leftType == typeof(string) && rightType == typeof(string))
                 {
@@ -1493,13 +1518,13 @@ namespace System.Data
             return false;
         }
 
-        internal int CompareValueTo(int record1, object value)
+        internal int CompareValueTo(int record1, object? value)
         {
             Debug.Assert(null != _storage, "null storage");
             return _storage.CompareValueTo(record1, value);
         }
 
-        internal object ConvertValue(object value)
+        internal object? ConvertValue(object? value)
         {
             Debug.Assert(null != _storage, "null storage");
             return _storage.ConvertValue(value);
@@ -1515,7 +1540,7 @@ namespace System.Data
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal DataColumn Clone()
         {
-            DataColumn clone = (DataColumn)Activator.CreateInstance(GetType());
+            DataColumn clone = (DataColumn)Activator.CreateInstance(GetType())!;
 
             clone.SimpleType = SimpleType;
 
@@ -1554,9 +1579,9 @@ namespace System.Data
         /// <summary>
         /// Finds a relation that this column is the sole child of or null.
         /// </summary>
-        internal DataRelation FindParentRelation()
+        internal DataRelation? FindParentRelation()
         {
-            var parentRelations = new DataRelation[Table.ParentRelations.Count];
+            var parentRelations = new DataRelation[Table!.ParentRelations.Count];
             Table.ParentRelations.CopyTo(parentRelations, 0);
 
             for (int i = 0; i < parentRelations.Length; i++)
@@ -1592,7 +1617,7 @@ namespace System.Data
         {
             if (AutoIncrement)
             {
-                object value = _autoInc.Current;
+                object value = _autoInc!.Current;
                 _autoInc.MoveAfter();
                 Debug.Assert(null != _storage, "no storage");
                 _storage.Set(record, value);
@@ -1639,7 +1664,7 @@ namespace System.Data
         internal bool IsInRelation()
         {
             DataKey key;
-            DataRelationCollection rels = _table.ParentRelations;
+            DataRelationCollection rels = _table!.ParentRelations;
 
             Debug.Assert(rels != null, "Invalid ParentRelations");
             for (int i = 0; i < rels.Count; i++)
@@ -1674,9 +1699,9 @@ namespace System.Data
 
             bool error = false;
             object value;
-            string errorText = null;
+            string? errorText = null;
 
-            foreach (DataRow dr in Table.Rows)
+            foreach (DataRow dr in Table!.Rows)
             {
                 if (dr.HasVersion(DataRowVersion.Current))
                 {
@@ -1741,18 +1766,19 @@ namespace System.Data
             OnPropertyChanging(new PropertyChangedEventArgs(name));
         }
 
-        private void InsureStorage()
+        private DataStorage InsureStorage()
         {
             if (_storage == null)
             {
                 _storage = DataStorage.CreateStorage(this, _dataType, _storageType);
             }
+
+            return _storage;
         }
 
         internal void SetCapacity(int capacity)
         {
-            InsureStorage();
-            _storage.SetCapacity(capacity);
+            InsureStorage().SetCapacity(capacity);
         }
 
         private bool ShouldSerializeDefaultValue() => !DefaultValueIsNull;
@@ -1764,38 +1790,36 @@ namespace System.Data
             ColumnName :
             ColumnName + " + " + Expression;
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal object ConvertXmlToObject(string s)
         {
             Debug.Assert(s != null, "Caller is resposible for missing element/attribute case");
-            InsureStorage();
-            return _storage.ConvertXmlToObject(s);
+            return InsureStorage().ConvertXmlToObject(s);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal object ConvertXmlToObject(XmlReader xmlReader, XmlRootAttribute xmlAttrib)
         {
-            InsureStorage();
-            return _storage.ConvertXmlToObject(xmlReader, xmlAttrib);
+            return InsureStorage().ConvertXmlToObject(xmlReader, xmlAttrib);
         }
 
-
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal string ConvertObjectToXml(object value)
         {
             Debug.Assert(value != null && (value != DBNull.Value), "Caller is resposible for checking on DBNull");
-            InsureStorage();
-            return _storage.ConvertObjectToXml(value);
+            return InsureStorage().ConvertObjectToXml(value);
         }
 
-        internal void ConvertObjectToXml(object value, XmlWriter xmlWriter, XmlRootAttribute xmlAttrib)
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
+        internal void ConvertObjectToXml(object value, XmlWriter xmlWriter, XmlRootAttribute? xmlAttrib)
         {
             Debug.Assert(value != null && (value != DBNull.Value), "Caller is resposible for checking on DBNull");
-            InsureStorage();
-            _storage.ConvertObjectToXml(value, xmlWriter, xmlAttrib);
+            InsureStorage().ConvertObjectToXml(value, xmlWriter, xmlAttrib);
         }
 
         internal object GetEmptyColumnStore(int recordCount)
         {
-            InsureStorage();
-            return _storage.GetEmptyStorageInternal(recordCount);
+            return InsureStorage().GetEmptyStorageInternal(recordCount);
         }
 
         internal void CopyValueIntoStore(int record, object store, BitArray nullbits, int storeIndex)
@@ -1804,10 +1828,10 @@ namespace System.Data
             _storage.CopyValueInternal(record, store, nullbits, storeIndex);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal void SetStorage(object store, BitArray nullbits)
         {
-            InsureStorage();
-            _storage.SetStorageInternal(store, nullbits);
+            InsureStorage().SetStorageInternal(store, nullbits);
         }
 
         internal void AddDependentColumn(DataColumn expressionColumn)
@@ -1819,7 +1843,7 @@ namespace System.Data
 
             Debug.Assert(!_dependentColumns.Contains(expressionColumn), "duplicate column - expected to be unique");
             _dependentColumns.Add(expressionColumn);
-            _table.AddDependentColumn(expressionColumn);
+            _table!.AddDependentColumn(expressionColumn);
         }
 
         internal void RemoveDependentColumn(DataColumn expressionColumn)
@@ -1828,11 +1852,12 @@ namespace System.Data
             {
                 _dependentColumns.Remove(expressionColumn);
             }
-            _table.RemoveDependentColumn(expressionColumn);
+            _table!.RemoveDependentColumn(expressionColumn);
         }
 
-        internal void HandleDependentColumnList(DataExpression oldExpression, DataExpression newExpression)
+        internal void HandleDependentColumnList(DataExpression? oldExpression, DataExpression? newExpression)
         {
+            Debug.Assert(_table != null);
             DataColumn[] dependency;
 
             // remove this column from the dependentColumn list of the columns this column depends on.
@@ -1867,6 +1892,14 @@ namespace System.Data
                 _table.AddDependentColumn(this);
             }
         }
+
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
+            Justification = "User has already got warning when creating original column.")]
+        internal void CopyExpressionFrom(DataColumn source)
+        {
+            Expression = source.Expression;
+        }
+
     }
 
     internal abstract class AutoIncrementValue

@@ -58,13 +58,17 @@ typedef enum {
 	MONO_AOT_MODE_FULL,
 	/* Same as full, but use only llvm compiled code */
 	MONO_AOT_MODE_LLVMONLY,
-	/* Uses Interpreter, JIT is disabled and not allowed,
-	 * equivalent to "--full-aot --interpreter" */
+	/*
+	 * Use interpreter only, no native code is generated
+	 * at runtime. Trampolines are loaded from corlib aot image.
+	 */
 	MONO_AOT_MODE_INTERP,
 	/* Same as INTERP, but use only llvm compiled code */
 	MONO_AOT_MODE_INTERP_LLVMONLY,
 	/* Use only llvm compiled code, fall back to the interpeter */
 	MONO_AOT_MODE_LLVMONLY_INTERP,
+	/* Same as --interp */
+	MONO_AOT_MODE_INTERP_ONLY,
 	/* Sentinel value used internally by the runtime. We use a large number to avoid clashing with some internal values. */
 	MONO_AOT_MODE_LAST = 1000,
 } MonoAotMode;

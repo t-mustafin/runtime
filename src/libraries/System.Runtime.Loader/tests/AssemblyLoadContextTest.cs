@@ -69,6 +69,7 @@ namespace System.Runtime.Loader.Tests
         }
 
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/51893", typeof(PlatformDetection), nameof(PlatformDetection.IsBuiltWithAggressiveTrimming), nameof(PlatformDetection.IsBrowser))]
         public static void LoadAssemblyByPath_ValidUserAssembly()
         {
             var asmName = new AssemblyName(TestAssembly);
@@ -78,10 +79,12 @@ namespace System.Runtime.Loader.Tests
             var asm = loadContext.LoadFromAssemblyName(asmName);
 
             Assert.NotNull(asm);
+            Assert.Same(loadContext, AssemblyLoadContext.GetLoadContext(asm));
             Assert.Contains(asm.DefinedTypes, t => t.Name == "TestClass");
         }
 
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/51893", typeof(PlatformDetection), nameof(PlatformDetection.IsBuiltWithAggressiveTrimming), nameof(PlatformDetection.IsBrowser))]
         public static void LoadAssemblyByStream_ValidUserAssembly()
         {
             var asmName = new AssemblyName(TestAssembly);
@@ -91,6 +94,7 @@ namespace System.Runtime.Loader.Tests
             var asm = loadContext.LoadFromAssemblyName(asmName);
 
             Assert.NotNull(asm);
+            Assert.Same(loadContext, AssemblyLoadContext.GetLoadContext(asm));
             Assert.Contains(asm.DefinedTypes, t => t.Name == "TestClass");
         }
 
@@ -105,6 +109,7 @@ namespace System.Runtime.Loader.Tests
         }
 
         [Fact]
+        [SkipOnPlatform(TestPlatforms.Browser, "Corelib does not exist on disc for Browser builds")]
         public static void LoadFromAssemblyName_ValidTrustedPlatformAssembly()
         {
             var asmName = typeof(System.Linq.Enumerable).Assembly.GetName();
@@ -118,6 +123,23 @@ namespace System.Runtime.Loader.Tests
             var loadedContext = AssemblyLoadContext.GetLoadContext(asm);
             Assert.NotNull(loadedContext);
             Assert.Same(loadContext, loadedContext);
+        }
+
+        [Fact]
+        public static void LoadFromAssemblyName_FallbackToDefaultContext()
+        {
+            var asmName = typeof(System.Linq.Enumerable).Assembly.GetName();
+            asmName.CodeBase = null;
+            var loadContext = new AssemblyLoadContext("FallbackToDefaultContextTest");
+
+            // This should not have any special handlers, so it should just find the version in the default context
+            var asm = loadContext.LoadFromAssemblyName(asmName);
+            Assert.NotNull(asm);
+            var loadedContext = AssemblyLoadContext.GetLoadContext(asm);
+            Assert.NotNull(loadedContext);
+            Assert.Same(AssemblyLoadContext.Default, loadedContext);
+            Assert.NotEqual(loadContext, loadedContext);
+            Assert.Same(typeof(System.Linq.Enumerable).Assembly, asm);
         }
 
         [Fact]
@@ -140,6 +162,7 @@ namespace System.Runtime.Loader.Tests
             var context = AssemblyLoadContext.GetLoadContext(asm);
 
             Assert.NotNull(context);
+            Assert.Same(AssemblyLoadContext.Default, context);
         }
 
         [Fact]

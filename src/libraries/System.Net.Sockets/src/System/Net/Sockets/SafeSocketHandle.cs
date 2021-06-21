@@ -38,7 +38,7 @@ namespace System.Net.Sockets
             SetHandleAndValid(preexistingHandle);
         }
 
-        private SafeSocketHandle() : base(ownsHandle: true) => OwnsHandle = true;
+        public SafeSocketHandle() : base(ownsHandle: true) => OwnsHandle = true;
 
         internal bool OwnsHandle { get; }
 
@@ -72,7 +72,7 @@ namespace System.Net.Sockets
             _released = true;
             bool shouldClose = TryOwnClose();
 
-            if (NetEventSource.IsEnabled) NetEventSource.Info(this, $"shouldClose={shouldClose}");
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, $"shouldClose={shouldClose}");
 
             // When shouldClose is true, the user called Dispose on the SafeHandle.
             // When it is false, the handle was closed from the Socket via CloseAsIs.
@@ -93,7 +93,7 @@ namespace System.Net.Sockets
 #endif
                 bool shouldClose = TryOwnClose();
 
-                if (NetEventSource.IsEnabled) NetEventSource.Info(this, $"shouldClose={shouldClose}");
+                if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, $"shouldClose={shouldClose}");
 
                 Dispose();
 
@@ -119,7 +119,7 @@ namespace System.Net.Sockets
             }
             catch (Exception exception) when (!ExceptionCheck.IsFatal(exception))
             {
-                NetEventSource.Fail(this, $"handle:{handle}, error:{exception}");
+                Debug.Fail($"handle:{handle}, error:{exception}");
                 throw;
             }
 #endif
@@ -133,7 +133,7 @@ namespace System.Net.Sockets
             try
             {
 #endif
-                if (NetEventSource.IsEnabled) NetEventSource.Info(this, $"handle:{handle}");
+                if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, $"handle:{handle}");
 
                 canceledOperations |= OnHandleClose();
 
@@ -150,11 +150,7 @@ namespace System.Net.Sockets
             }
             catch (Exception exception)
             {
-                if (!ExceptionCheck.IsFatal(exception))
-                {
-                    NetEventSource.Fail(this, $"handle:{handle}, error:{exception}");
-                }
-
+                Debug.Assert(ExceptionCheck.IsFatal(exception), $"handle:{handle}, error:{exception}");
                 ret = true;  // Avoid a second assert.
                 throw;
             }
@@ -162,10 +158,7 @@ namespace System.Net.Sockets
             {
                 _closeSocketThread = Environment.CurrentManagedThreadId;
                 _closeSocketTick = Environment.TickCount;
-                if (!ret)
-                {
-                    NetEventSource.Fail(this, $"ReleaseHandle failed. handle:{handle}");
-                }
+                Debug.Assert(ret, $"ReleaseHandle failed. handle:{handle}");
             }
 #endif
         }

@@ -1,12 +1,10 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
-// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Collections.Generic;
-
 
 // UTF8 
 class UTF8StringTests
@@ -153,7 +151,7 @@ class UTF8StructMarshalling
             utf8Struct.index = i;
             TestStructWithUtf8Field(utf8Struct);
         }
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        if (!OperatingSystem.IsWindows())
          CompareWithUTF8Encoding();
 
         string testString = "StructTestString\uD83D\uDE00";

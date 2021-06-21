@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Text;
@@ -23,6 +26,8 @@ namespace System.IO.Pipelines.Tests
             Assert.Equal(0, stream.Length);
 
             writer.Complete();
+
+
         }
 
         [Fact]
@@ -39,6 +44,7 @@ namespace System.IO.Pipelines.Tests
 
             writer.Complete();
 
+            Assert.Equal(0, writer.UnflushedBytes);
             Assert.Equal(bytes.Length, stream.Length);
             Assert.Equal("Hello World", Encoding.ASCII.GetString(stream.ToArray()));
         }
@@ -59,6 +65,7 @@ namespace System.IO.Pipelines.Tests
 
             Assert.Equal(bytes.Length, stream.Length);
             Assert.Equal("Hello World", Encoding.ASCII.GetString(stream.ToArray()));
+            Assert.Equal(0, writer.UnflushedBytes);
         }
 
         [Fact]
@@ -129,6 +136,8 @@ namespace System.IO.Pipelines.Tests
             Assert.Equal("Hello World", Encoding.ASCII.GetString(stream.ToArray()));
 
             writer.Complete();
+
+            Assert.Equal(0, writer.UnflushedBytes);
         }
 
         [Fact]
@@ -140,6 +149,7 @@ namespace System.IO.Pipelines.Tests
 
             Assert.False(stream.FlushAsyncCalled);
             writer.Complete();
+            Assert.Equal(0, writer.UnflushedBytes);
         }
 
         [Fact]
@@ -159,6 +169,7 @@ namespace System.IO.Pipelines.Tests
             await writer.FlushAsync();
             Assert.Equal(bytes, stream.ToArray());
             writer.Complete();
+            Assert.Equal(0, writer.UnflushedBytes);
         }
 
         [Fact]
@@ -178,6 +189,7 @@ namespace System.IO.Pipelines.Tests
             await writer.FlushAsync();
             Assert.Equal(bytes, stream.ToArray());
             writer.Complete();
+            Assert.Equal(0, writer.UnflushedBytes);
         }
 
         [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsThreadingSupported))]
@@ -394,6 +406,7 @@ namespace System.IO.Pipelines.Tests
                 Assert.Equal(1, pool.DisposedBlocks);
 
                 writer.Complete();
+                Assert.Equal(0, writer.UnflushedBytes);
                 Assert.Equal(0, pool.CurrentlyRentedBlocks);
                 Assert.Equal(3, pool.DisposedBlocks);
             }
@@ -438,6 +451,7 @@ namespace System.IO.Pipelines.Tests
                 Assert.Equal(0, stream.Length);
 
                 writer.Complete();
+                Assert.Equal(0, writer.UnflushedBytes);
                 Assert.Equal(0, pool.CurrentlyRentedBlocks);
                 Assert.Equal(1, pool.DisposedBlocks);
             }
@@ -459,7 +473,7 @@ namespace System.IO.Pipelines.Tests
                 Assert.Equal(0, pool.DisposedBlocks);
 
                 writer.Complete();
-
+                Assert.Equal(0, writer.UnflushedBytes);
                 Assert.Equal(0, pool.CurrentlyRentedBlocks);
                 Assert.Equal(1, pool.DisposedBlocks);
             }
@@ -479,7 +493,7 @@ namespace System.IO.Pipelines.Tests
                 Assert.Equal(0, pool.DisposedBlocks);
 
                 writer.Complete();
-
+                Assert.Equal(0, writer.UnflushedBytes);
                 Assert.Equal(0, pool.CurrentlyRentedBlocks);
                 Assert.Equal(0, pool.DisposedBlocks);
             }
@@ -587,7 +601,25 @@ namespace System.IO.Pipelines.Tests
             PipeWriter writer = PipeWriter.Create(new ThrowsOperationCanceledExceptionStream());
 
             await Assert.ThrowsAsync<OperationCanceledException>(async () => await writer.WriteAsync(new byte[1]));
-            await Assert.ThrowsAsync<OperationCanceledException>(async () => await writer.FlushAsync());
+        }
+
+        [Fact]
+        public void UnflushedBytesWorks()
+        {
+            byte[] bytes = Encoding.ASCII.GetBytes("Hello World");
+            var stream = new MemoryStream();
+            PipeWriter writer = PipeWriter.Create(stream);
+
+            Assert.True(writer.CanGetUnflushedBytes);
+
+            bytes.AsSpan().CopyTo(writer.GetSpan(bytes.Length));
+            writer.Advance(bytes.Length);
+
+            Assert.Equal(bytes.Length, writer.UnflushedBytes);
+
+            writer.Complete();
+
+            Assert.Equal(0, writer.UnflushedBytes);
         }
 
         private class ThrowsOperationCanceledExceptionStream : WriteOnlyStream

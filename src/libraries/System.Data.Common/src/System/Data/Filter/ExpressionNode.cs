@@ -3,14 +3,15 @@
 
 using System.Collections.Generic;
 using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data
 {
     internal abstract class ExpressionNode
     {
-        private DataTable _table;
+        private DataTable? _table;
 
-        protected ExpressionNode(DataTable table)
+        protected ExpressionNode(DataTable? table)
         {
             _table = table;
         }
@@ -31,7 +32,7 @@ namespace System.Data
             }
         }
 
-        protected DataTable table
+        protected DataTable? table
         {
             get { return _table; }
         }
@@ -43,13 +44,17 @@ namespace System.Data
         }
 
         internal abstract void Bind(DataTable table, List<DataColumn> list);
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal abstract object Eval();
-        internal abstract object Eval(DataRow row, DataRowVersion version);
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
+        internal abstract object Eval(DataRow? row, DataRowVersion version);
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal abstract object Eval(int[] recordNos);
         internal abstract bool IsConstant();
         internal abstract bool IsTableConstant();
         internal abstract bool HasLocalAggregate();
         internal abstract bool HasRemoteAggregate();
+
         internal abstract ExpressionNode Optimize();
         internal virtual bool DependsOn(DataColumn column)
         {

@@ -3,18 +3,19 @@
 
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data
 {
     internal sealed class LookupNode : ExpressionNode
     {
-        private readonly string _relationName;    // can be null
+        private readonly string? _relationName;    // can be null
         private readonly string _columnName;
 
-        private DataColumn _column;
-        private DataRelation _relation;
+        private DataColumn? _column;
+        private DataRelation? _relation;
 
-        internal LookupNode(DataTable table, string columnName, string relationName) : base(table)
+        internal LookupNode(DataTable? table, string columnName, string? relationName) : base(table)
         {
             _relationName = relationName;
             _columnName = columnName;
@@ -27,7 +28,7 @@ namespace System.Data
             _relation = null;
 
             if (table == null)
-                throw ExprException.ExpressionUnbound(ToString());
+                throw ExprException.ExpressionUnbound(ToString()!);
 
             // First find parent table
 
@@ -40,7 +41,7 @@ namespace System.Data
 
                 if (relations.Count > 1)
                 {
-                    throw ExprException.UnresolvedRelation(table.TableName, ToString());
+                    throw ExprException.UnresolvedRelation(table.TableName, ToString()!);
                 }
                 _relation = relations[0];
             }
@@ -50,7 +51,7 @@ namespace System.Data
             }
             if (null == _relation)
             {
-                throw ExprException.BindFailure(_relationName); // this operation is not clone specific, throw generic exception
+                throw ExprException.BindFailure(_relationName!); // this operation is not clone specific, throw generic exception
             }
             DataTable parentTable = _relation.ParentTable;
 
@@ -82,26 +83,29 @@ namespace System.Data
             AggregateNode.Bind(_relation, list);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal override object Eval()
         {
             throw ExprException.EvalNoContext();
         }
 
-        internal override object Eval(DataRow row, DataRowVersion version)
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
+        internal override object Eval(DataRow? row, DataRowVersion version)
         {
             if (_column == null || _relation == null)
-                throw ExprException.ExpressionUnbound(ToString());
+                throw ExprException.ExpressionUnbound(ToString()!);
 
-            DataRow parent = row.GetParentRow(_relation, version);
+            DataRow? parent = row!.GetParentRow(_relation, version);
             if (parent == null)
                 return DBNull.Value;
 
             return parent[_column, parent.HasVersion(version) ? version : DataRowVersion.Current];
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         internal override object Eval(int[] recordNos)
         {
-            throw ExprException.ComputeNotAggregate(ToString());
+            throw ExprException.ComputeNotAggregate(ToString()!);
         }
 
         internal override bool IsConstant()

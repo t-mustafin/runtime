@@ -1,7 +1,8 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Net.Sockets;
@@ -23,7 +24,7 @@ namespace System.Net
     ///     This means basic command sending and parsing.
     /// </para>
     /// </summary>
-    internal class FtpControlStream : CommandStream
+    internal sealed class FtpControlStream : CommandStream
     {
         private Socket? _dataSocket;
         private IPEndPoint? _passiveEndPoint;
@@ -222,7 +223,7 @@ namespace System.Net
         //    This function controls the setting up of a data socket/connection, and of saving off the server responses.
         protected override PipelineInstruction PipelineCallback(PipelineEntry? entry, ResponseDescription? response, bool timeout, ref Stream? stream)
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Info(this, $"Command:{entry?.Command} Description:{response?.StatusDescription}");
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, $"Command:{entry?.Command} Description:{response?.StatusDescription}");
 
             // null response is not expected
             if (response == null)
@@ -453,10 +454,11 @@ namespace System.Net
             bool resetLoggedInState = false;
             FtpWebRequest request = (FtpWebRequest)req;
 
-            if (NetEventSource.IsEnabled) NetEventSource.Info(this);
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this);
 
             _responseUri = request.RequestUri;
-            ArrayList commandList = new ArrayList();
+
+            var commandList = new List<PipelineEntry>();
 
             if (request.EnableSsl && !UsingSecureStream)
             {
@@ -499,6 +501,7 @@ namespace System.Net
                 if (domainUserName.Length == 0 && password.Length == 0)
                 {
                     domainUserName = "anonymous";
+                    // [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Suppression approved. Anonymous FTP credential in production code.")]
                     password = "anonymous@";
                 }
 
@@ -625,7 +628,7 @@ namespace System.Net
 
             commandList.Add(new PipelineEntry(FormatFtpCommand("QUIT", null)));
 
-            return (PipelineEntry[])commandList.ToArray(typeof(PipelineEntry));
+            return commandList.ToArray();
         }
 
         private PipelineInstruction QueueOrCreateDataConection(PipelineEntry entry, ResponseDescription response, bool timeout, ref Stream? stream, out bool isSocketReady)
@@ -664,10 +667,7 @@ namespace System.Net
 
             if (isPassive)
             {
-                if (port == -1)
-                {
-                    NetEventSource.Fail(this, "'port' not set.");
-                }
+                Debug.Assert(port != -1, "'port' not set.");
 
                 try
                 {
@@ -690,7 +690,7 @@ namespace System.Net
             {
                 IPEndPoint passiveEndPoint = _passiveEndPoint;
                 _passiveEndPoint = null;
-                if (NetEventSource.IsEnabled) NetEventSource.Info(this, "starting Connect()");
+                if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, "starting Connect()");
                 if (_isAsync)
                 {
                     _dataSocket!.BeginConnect(passiveEndPoint, s_connectCallbackDelegate, this);
@@ -704,7 +704,7 @@ namespace System.Net
             }
             else
             {
-                if (NetEventSource.IsEnabled) NetEventSource.Info(this, "starting Accept()");
+                if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, "starting Accept()");
 
                 if (_isAsync)
                 {
@@ -807,14 +807,12 @@ namespace System.Net
         /// </summary>
         private string FormatAddressV6(IPAddress address, int port)
         {
-            StringBuilder sb = new StringBuilder(43); // based on max size of IPv6 address + port + seperators
-            string addressString = address.ToString();
-            sb.Append("|2|");
-            sb.Append(addressString);
-            sb.Append('|');
-            sb.Append(port.ToString(NumberFormatInfo.InvariantInfo));
-            sb.Append('|');
-            return sb.ToString();
+            return
+                "|2|" +
+                address.ToString() +
+                "|" +
+                port.ToString(NumberFormatInfo.InvariantInfo) +
+                "|";
         }
 
         internal long ContentLength
@@ -1122,15 +1120,9 @@ namespace System.Net
         /// </summary>
         private string FormatFtpCommand(string command, string? parameter)
         {
-            StringBuilder stringBuilder = new StringBuilder(command.Length + ((parameter != null) ? parameter.Length : 0) + 3 /*size of ' ' \r\n*/);
-            stringBuilder.Append(command);
-            if (!string.IsNullOrEmpty(parameter))
-            {
-                stringBuilder.Append(' ');
-                stringBuilder.Append(parameter);
-            }
-            stringBuilder.Append("\r\n");
-            return stringBuilder.ToString();
+            return string.IsNullOrEmpty(parameter) ?
+                command + "\r\n" :
+                command + " " + parameter + "\r\n";
         }
 
         /// <summary>
@@ -1138,7 +1130,7 @@ namespace System.Net
         ///     This will handle either connecting to a port or listening for one
         ///    </para>
         /// </summary>
-        protected Socket CreateFtpDataSocket(FtpWebRequest request, Socket templateSocket)
+        private Socket CreateFtpDataSocket(FtpWebRequest request, Socket templateSocket)
         {
             // Safe to be called under an Assert.
             Socket socket = new Socket(templateSocket.AddressFamily, templateSocket.SocketType, templateSocket.ProtocolType);
@@ -1152,7 +1144,7 @@ namespace System.Net
 
         protected override bool CheckValid(ResponseDescription response, ref int validThrough, ref int completeLength)
         {
-            if (NetEventSource.IsEnabled) NetEventSource.Info(this, $"CheckValid({response.StatusBuffer})");
+            if (NetEventSource.Log.IsEnabled()) NetEventSource.Info(this, $"CheckValid({response.StatusBuffer})");
 
             // If the response is less than 4 bytes long, it is too short to tell, so return true, valid so far.
             if (response.StatusBuffer.Length < 4)

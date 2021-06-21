@@ -1,6 +1,5 @@
 ' Licensed to the .NET Foundation under one or more agreements.
 ' The .NET Foundation licenses this file to you under the MIT license.
-' See the LICENSE file in the project root for more information.
 
 Option Strict On
 
@@ -14,6 +13,7 @@ Imports Microsoft.VisualBasic.CompilerServices.Symbols
 Imports Microsoft.VisualBasic.CompilerServices.ConversionResolution
 Imports Microsoft.VisualBasic.CompilerServices.Utils
 Imports Microsoft.VisualBasic.CompilerServices.ReflectionExtensions
+Imports System.Diagnostics.CodeAnalysis
 
 #Const BINDING_LOG = False
 #Const GENERICITY_LOG = False
@@ -116,6 +116,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
             Return
         End Sub
 
+        <RequiresUnreferencedCode("ClassifyConversion")>
         Private Shared Sub CompareParameterSpecificity(
             ByVal argumentType As Type,
             ByVal leftParameter As ParameterInfo,
@@ -473,6 +474,7 @@ Namespace Microsoft.VisualBasic.CompilerServices
 
         End Function
 
+        <RequiresUnreferencedCode("Calls RejectUncallableProcedure")>
         Private Shared Sub InsertIfMethodAvailable(
             ByVal newCandidate As MemberInfo,
             ByVal newCandidateSignature As ParameterInfo(),
@@ -707,6 +709,7 @@ continueloop:
 
         End Sub
 
+        <RequiresUnreferencedCode("Calls InsertIfMethodAvailable")>
         Friend Shared Function CollectOverloadCandidates(
             ByVal members As MemberInfo(),
             ByVal arguments As Object(),
@@ -919,6 +922,7 @@ nextcandidate:
             Return candidates
         End Function
 
+        <RequiresUnreferencedCode("Calls ClassifyConversion")>
         Private Shared Function CanConvert(
             ByVal targetType As Type,
             ByVal sourceType As Type,
@@ -976,6 +980,7 @@ nextcandidate:
             Return False
         End Function
 
+        <RequiresUnreferencedCode("Calls GetInterfaces on argument type recursively")>
         Private Shared Function InferTypeArgumentsFromArgument(
             ByVal argumentType As Type,
             ByVal parameterType As Type,
@@ -1100,6 +1105,7 @@ RetryInference:
         End Function
 
 
+        <RequiresUnreferencedCode("Calls InferTypeArgumentsFromArgument")>
         Private Shared Function InferTypeArgumentsFromArgumentDirectly(
             ByVal argumentType As Type,
             ByVal parameterType As Type,
@@ -1201,6 +1207,7 @@ RetryInference:
 
         End Function
 
+        <RequiresUnreferencedCode("Calls ClassifyConversion")>
         Private Shared Function CanPassToParamArray(
             ByVal targetProcedure As Method,
             ByVal argument As Object,
@@ -1220,6 +1227,7 @@ RetryInference:
             Return conversionResult = ConversionClass.Widening OrElse conversionResult = ConversionClass.Identity
         End Function
 
+        <RequiresUnreferencedCode("Calls CanConvert")>
         Friend Shared Function CanPassToParameter(
             ByVal targetProcedure As Method,
             ByVal argument As Object,
@@ -1290,6 +1298,7 @@ RetryInference:
 
         End Function
 
+        <RequiresUnreferencedCode("Calls InferTypArgumentsFromArgument")>
         Friend Shared Function InferTypeArgumentsFromArgument(
             ByVal targetProcedure As Method,
             ByVal argument As Object,
@@ -1324,9 +1333,11 @@ RetryInference:
             Return True
         End Function
 
+        <RequiresUnreferencedCode("Uses Type.GetElementType which cannot be statically analyzed.")>
         Friend Shared Function PassToParameter(
             ByVal argument As Object,
             ByVal parameter As ParameterInfo,
+            <DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)>
             ByVal parameterType As Type) As Object
 
             'This function takes an object and modifies it so it can be passed
@@ -1393,6 +1404,7 @@ RetryInference:
             Return result
         End Function
 
+        <RequiresUnreferencedCode("Calls InstantiateGenericMethod")>
         Friend Shared Function CanMatchArguments(
             ByVal targetProcedure As Method,
             ByVal arguments As Object(),
@@ -1650,6 +1662,7 @@ skipargument:
 
         End Function
 
+        <RequiresUnreferencedCode("Calls Method.BindGenericArguments")>
         Private Shared Function InstantiateGenericMethod(
             ByVal targetProcedure As Method,
             ByVal typeArguments As Type(),
@@ -1691,6 +1704,7 @@ skipargument:
 
         'may not want Method as TargetProcedure - may instead want to pass the required information in separately.
         'this means that for the simple case of only one method we do not need to allocate a Method object.
+        <RequiresUnreferencedCode("Cannot statically analyze the parameter types of the targetProcedure")>
         Friend Shared Sub MatchArguments(
             ByVal targetProcedure As Method,
             ByVal arguments As Object(),
@@ -1828,6 +1842,7 @@ skipargument:
             Return
         End Sub
 
+        <RequiresUnreferencedCode("Calls InferTypeArgumentsFromArgument")>
         Private Shared Function InferTypeArguments(
             ByVal targetProcedure As Method,
             ByVal arguments As Object(),
@@ -2036,6 +2051,7 @@ skipargument:
             Return
         End Sub
 
+        <RequiresUnreferencedCode("Calls RejectUncallableProcedure")>
         Private Shared Function RejectUncallableProcedures(
             ByVal candidates As List(Of Method),
             ByVal arguments As Object(),
@@ -2087,6 +2103,7 @@ skipargument:
 
         End Function
 
+        <RequiresUnreferencedCode("Calls CanMatchArguments")>
         Private Shared Sub RejectUncallableProcedure(
             ByVal candidate As Method,
             ByVal arguments As Object(),
@@ -2122,6 +2139,7 @@ skipargument:
             Return argument.GetType
         End Function
 
+        <RequiresUnreferencedCode("Calls Method.RawParametersFromType")>
         Private Shared Function MoreSpecificProcedure(
             ByVal left As Method,
             ByVal right As Method,
@@ -2284,6 +2302,7 @@ skipargument:
             Return Nothing
         End Function
 
+        <RequiresUnreferencedCode("Calls MoreSpecificProcedure")>
         Private Shared Function MostSpecificProcedure(
             ByVal candidates As List(Of Method),
             ByRef candidateCount As Integer,
@@ -2344,6 +2363,7 @@ skipargument:
             Return Nothing
         End Function
 
+        <RequiresUnreferencedCode("Calls MoreSpecificProcedure")>
         Private Shared Function RemoveRedundantGenericProcedures(
             ByVal candidates As List(Of Method),
             ByRef candidateCount As Integer,
@@ -2558,6 +2578,7 @@ skipargument:
             End If
         End Function
 
+        <RequiresUnreferencedCode("Calls CanMatchArguments")>
         Private Shared Function DetectArgumentErrors(
             ByVal targetProcedure As Method,
             ByVal arguments As Object(),
@@ -2578,6 +2599,7 @@ skipargument:
             Return candidate.NotCallable
         End Function
 
+        <RequiresUnreferencedCode("Calls ReportOverloadResolutionFailure")>
         Private Shared Function ReportUncallableProcedures(
             ByVal overloadedProcedureName As String,
             ByVal candidates As List(Of Method),
@@ -2598,6 +2620,7 @@ skipargument:
                     AddressOf CandidateIsNotCallable)
         End Function
 
+        <RequiresUnreferencedCode("Calls CanMatchArguments")>
         Private Shared Function DetectArgumentNarrowing(
             ByVal targetProcedure As Method,
             ByVal arguments As Object(),
@@ -2618,6 +2641,7 @@ skipargument:
             Return Not candidate.NotCallable AndAlso candidate.RequiresNarrowingConversion
         End Function
 
+        <RequiresUnreferencedCode("Calls ReportOverloadResolutionFailure")>
         Private Shared Function ReportNarrowingProcedures(
             ByVal overloadedProcedureName As String,
             ByVal candidates As List(Of Method),
@@ -2670,6 +2694,7 @@ skipargument:
                     AddressOf CandidateIsUnspecific)
         End Function
 
+        <RequiresUnreferencedCode("Calls MostSpecificProcedure and RemoveRedundantGenericProcedures")>
         Friend Shared Function ResolveOverloadedCall(
                 ByVal methodName As String,
                 ByVal candidates As List(Of Method),
@@ -2769,6 +2794,7 @@ skipargument:
             Return Nothing
         End Function
 
+        <RequiresUnreferencedCode("Calls ResolveOverloadedCall")>
         Friend Shared Function ResolveOverloadedCall(
                 ByVal methodName As String,
                 ByVal members As MemberInfo(),

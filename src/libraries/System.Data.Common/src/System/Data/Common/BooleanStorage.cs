@@ -4,6 +4,7 @@
 using System.Xml;
 using System.Collections;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System.Data.Common
 {
@@ -11,7 +12,7 @@ namespace System.Data.Common
     {
         private const bool defaultValue = false;
 
-        private bool[] _values;
+        private bool[] _values = default!; // Late-initialized
 
         internal BooleanStorage(DataColumn column) :
             base(column, typeof(bool), defaultValue, StorageType.Boolean)
@@ -57,12 +58,12 @@ namespace System.Data.Common
                         }
                         return _nullValue;
 
-                    case AggregateType.First:
+                    case AggregateType.First: // Does not seem to be implemented
                         if (records.Length > 0)
                         {
                             return _values[records[0]];
                         }
-                        return null;
+                        return null!;
 
                     case AggregateType.Count:
                         return base.Aggregate(records, kind);
@@ -89,7 +90,7 @@ namespace System.Data.Common
             return valueNo1.CompareTo(valueNo2);
         }
 
-        public override int CompareValueTo(int recordNo, object value)
+        public override int CompareValueTo(int recordNo, object? value)
         {
             Debug.Assert(0 <= recordNo, "Invalid record");
             Debug.Assert(null != value, "null value");
@@ -111,7 +112,7 @@ namespace System.Data.Common
             return valueNo1.CompareTo((bool)value);
         }
 
-        public override object ConvertValue(object value)
+        public override object ConvertValue(object? value)
         {
             if (_nullValue != value)
             {
@@ -169,11 +170,13 @@ namespace System.Data.Common
             base.SetCapacity(capacity);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override object ConvertXmlToObject(string s)
         {
             return XmlConvert.ToBoolean(s);
         }
 
+        [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
         public override string ConvertObjectToXml(object value)
         {
             return XmlConvert.ToString((bool)value);

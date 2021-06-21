@@ -1,3 +1,6 @@
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Test.Common;
@@ -49,7 +52,7 @@ namespace System.Net.Http.Functional.Tests
 
                             TextReader clientReader = new StreamReader(clientStream);
                             TextWriter clientWriter = new StreamWriter(clientStream) { AutoFlush = true };
-                            TextWriter serverWriter = connection.Writer;
+                            TextWriter serverWriter = new StreamWriter(connection.Stream, leaveOpen: true) { AutoFlush = true };
 
                             const string helloServer = "hello server";
                             const string helloClient = "hello client";

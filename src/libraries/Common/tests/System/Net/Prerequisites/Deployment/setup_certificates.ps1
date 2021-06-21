@@ -1,20 +1,19 @@
 # Licensed to the .NET Foundation under one or more agreements.
 # The .NET Foundation licenses this file to you under the MIT license.
-# See the LICENSE file in the project root for more information.
 
 #Requires -RunAsAdministrator
 
 # Certificate configuration
 
-$script:testDataUri = "https://github.com/dotnet/runtime-assets/archive/master.zip" 
+$script:testDataUri = "https://github.com/dotnet/runtime-assets/archive/main.zip" 
 $script:testData = "runtime-assets"
-$script:certificatePath = "$($script:testData)\runtime-assets-master\System.Net.TestData"
+$script:certificatePath = "$($script:testData)\src\System.Net.TestData\TestDataCertificates"
 
 $script:clientPrivateKeyPath = Join-Path $script:certificatePath "testclient1_at_contoso.com.pfx"
-$script:clientPrivateKeyPassword = "testcertificate"
+$script:clientPrivateKeyPassword = "PLACEHOLDER"
 
 $script:serverPrivateKeyPath = Join-Path $script:certificatePath "contoso.com.pfx"
-$script:serverPrivateKeyPassword = "testcertificate"
+$script:serverPrivateKeyPassword = "PLACEHOLDER"
 
 Function GetFullPath($relativePath)
 {

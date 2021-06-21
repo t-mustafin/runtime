@@ -9,6 +9,7 @@
 */
 
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace System.Xml.Xsl
@@ -20,12 +21,12 @@ namespace System.Xml.Xsl
     {
         public static uint DblHi(double dbl)
         {
-            return (uint)(BitConverter.DoubleToInt64Bits(dbl) >> 32);
+            return (uint)(BitConverter.DoubleToUInt64Bits(dbl) >> 32);
         }
 
         public static uint DblLo(double dbl)
         {
-            return unchecked((uint)BitConverter.DoubleToInt64Bits(dbl));
+            return unchecked((uint)BitConverter.DoubleToUInt64Bits(dbl));
         }
 
         // Returns true if value is infinite or NaN (exponent bits are all ones)
@@ -658,7 +659,7 @@ namespace System.Xml.Xsl
                         AddU(ref dblHi, 1);
                     }
                 }
-                return BitConverter.Int64BitsToDouble((long)dblHi << 32 | dblLo);
+                return BitConverter.UInt64BitsToDouble((ulong)dblHi << 32 | dblLo);
             }
 
             // Lop off the integer part and return it.
@@ -1111,7 +1112,7 @@ namespace System.Xml.Xsl
                     dblHi = DblHi(dblT);
                     dblHi &= 0x000FFFFF;
                     dblHi |= 0x3FF00000;
-                    dblT = BitConverter.Int64BitsToDouble((long)dblHi << 32 | DblLo(dblT));
+                    dblT = BitConverter.UInt64BitsToDouble((ulong)dblHi << 32 | DblLo(dblT));
 
                     // Adjust wExp2 because we don't have the implicit bit.
                     wExp2++;
@@ -1122,7 +1123,7 @@ namespace System.Xml.Xsl
                     // First multiply by a power of 2 to get a normalized value.
                     dblHi &= 0x000FFFFF;
                     dblHi |= 0x3FF00000;
-                    dblT = BitConverter.Int64BitsToDouble((long)dblHi << 32 | dblLo);
+                    dblT = BitConverter.UInt64BitsToDouble((ulong)dblHi << 32 | dblLo);
 
                     // This is the power of 2.
                     w1 = wExp2 + 52;
@@ -1682,7 +1683,7 @@ namespace System.Xml.Xsl
         * Hungarian: bi
         *
         */
-        private class BigInteger : IComparable
+        private sealed class BigInteger : IComparable
         {
             // Make this big enough that we rarely have to reallocate.
             private const int InitCapacity = 30;
@@ -2016,8 +2017,9 @@ namespace System.Xml.Xsl
                 AssertValid();
             }
 
-            public int CompareTo(object obj)
+            public int CompareTo(object? obj)
             {
+                Debug.Assert(obj != null);
                 BigInteger bi = (BigInteger)obj;
                 AssertValid();
                 bi.AssertValid();
@@ -2305,7 +2307,7 @@ namespace System.Xml.Xsl
                         }
                     }
                 }
-                return BitConverter.Int64BitsToDouble((long)dblHi << 32 | dblLo);
+                return BitConverter.UInt64BitsToDouble((ulong)dblHi << 32 | dblLo);
             }
 #endif
         };
@@ -2313,7 +2315,7 @@ namespace System.Xml.Xsl
         /**
         * Floating point number represented in base-10.
         */
-        private class FloatingDecimal
+        private sealed class FloatingDecimal
         {
             public const int MaxDigits = 50;
             private const int MaxExp10 = 310;  // Upper bound on base 10 exponent
@@ -2845,37 +2847,6 @@ namespace System.Xml.Xsl
         };
 
         /*  ----------------------------------------------------------------------------
-            IntToString()
-
-            Converts an integer to a string according to XPath rules.
-        */
-        private static unsafe string IntToString(int val)
-        {
-            // The maximum number of characters needed to represent any int value is 11
-            const int BufSize = 12;
-            char* pBuf = stackalloc char[BufSize];
-            char* pch = pBuf += BufSize;
-            uint u = (uint)(val < 0 ? -val : val);
-
-            while (u >= 10)
-            {
-                // Fast division by 10
-                uint quot = (uint)((0x66666667L * u) >> 32) >> 2;
-                *(--pch) = (char)((u - quot * 10) + '0');
-                u = quot;
-            }
-
-            *(--pch) = (char)(u + '0');
-
-            if (val < 0)
-            {
-                *(--pch) = '-';
-            }
-
-            return new string(pch, 0, (int)(pBuf - pch));
-        }
-
-        /*  ----------------------------------------------------------------------------
             DoubleToString()
 
             Converts a floating point number to a string according to XPath rules.
@@ -2888,7 +2859,7 @@ namespace System.Xml.Xsl
 
             if (IsInteger(dbl, out iVal))
             {
-                return IntToString(iVal);
+                return iVal.ToString(CultureInfo.InvariantCulture);
             }
 
             // Handle NaN and infinity

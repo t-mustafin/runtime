@@ -2,9 +2,11 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Test.Cryptography;
+using Xunit;
 
 namespace System.Security.Cryptography.Hashing.Algorithms.Tests
 {
+    [SkipOnPlatform(TestPlatforms.Browser, "Not supported on Browser")]
     public abstract class Rfc2202HmacTests : HmacTests
     {
         private static readonly byte[][] s_testData2202 =
@@ -22,8 +24,8 @@ namespace System.Security.Cryptography.Hashing.Algorithms.Tests
         // The keys for test cases 1, 3, and 5 for RFC2202 are sized to match the
         // algorithm (16 bytes for MD5, 20 for SHA-1), so they need to be provided by
         // the more derived type.
-        protected Rfc2202HmacTests(byte[][] testKeys) :
-            base(testKeys, s_testData2202)
+        protected Rfc2202HmacTests(byte[][] testKeys, byte[][] testMacs) :
+            base(testKeys, s_testData2202, testMacs)
         {
         }
     }

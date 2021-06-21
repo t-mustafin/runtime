@@ -1,3 +1,6 @@
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -23,7 +26,7 @@ namespace Systen.Net.Mail.Tests
         private bool _disposed = false;
         private readonly Socket _listenSocket;
         private readonly ConcurrentBag<Socket> _socketsToDispose;
-        private long _messageCounter = new Random().Next(1000, 2000);
+        private long _messageCounter = Random.Shared.Next(1000, 2000);
 
         public readonly int Port;
         public SmtpClient CreateClient() => new SmtpClient("localhost", Port);
