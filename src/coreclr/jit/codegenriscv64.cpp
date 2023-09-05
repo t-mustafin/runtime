@@ -7944,75 +7944,65 @@ void CodeGen::genFnPrologCalleeRegArgs()
             {
                 assert(genIsValidIntReg((regNumber)regArg[i]));
                 assert(genIsValidIntReg((regNumber)regArgInit[i]));
+                assert(regArg[i] != regArgInit[i]);
 
-                regArgNum--;
-                regArgMaskLive &= ~genRegMask((regNumber)regArg[i]);
-                if ((regArgMaskIsInt & (1 << regArg[i])) != 0)
-                {
-                    ins = INS_slliw;
-                }
-                else
-                {
-                    ins = INS_ori;
-                }
+                unsigned tmpRegs[MAX_REG_ARG] = {0};    // regArg indexes list
+                int count = 0;                          // Number of nodes in list
+                bool loop = false;                      // List has a loop
 
-                if (regArgNum == 0)
+                for (int cur = i; regArg[cur] != 0; cur = regArgInit[cur] - REG_ARG_FIRST, count++)
                 {
-                    GetEmitter()->emitIns_R_R_I(ins, EA_PTRSIZE, (regNumber)regArgInit[i], (regNumber)regArg[i], 0);
-                    break;
-                }
-                else if (regArgInit[i] > regArg[i])
-                {
-                    GetEmitter()->emitIns_R_R_I(ins, EA_PTRSIZE, (regNumber)regArgInit[i], (regNumber)regArg[i], 0);
-                }
-                else
-                {
-                    assert(i > 0);
-                    assert(regArgNum > 0);
-
-                    int j = regArgInit[i] - REG_ARG_FIRST;
-                    assert((j >= 0) && (j < MAX_REG_ARG));
-                    if (regArg[j] == 0)
+                    if (cur == i && count > 0)
                     {
-                        GetEmitter()->emitIns_R_R_I(ins, EA_PTRSIZE, (regNumber)regArgInit[i], (regNumber)regArg[i], 0);
+                        loop = true;
+                        break;
                     }
-                    else
-                    {
-                        int k = regArgInit[j] - REG_ARG_FIRST;
-                        // assert((k >= 0) && (k < MAX_REG_ARG));
-                        instruction ins2 = (regArgMaskIsInt & (1 << regArg[j])) != 0 ? INS_slliw : INS_ori;
-                        if ((regArg[k] == 0) || (k > i) || k < 0)
-                        {
-                            GetEmitter()->emitIns_R_R_I(ins2, EA_PTRSIZE, (regNumber)regArgInit[j],
-                                                        (regNumber)regArg[j], 0);
-                            GetEmitter()->emitIns_R_R_I(ins, EA_PTRSIZE, (regNumber)regArgInit[i], (regNumber)regArg[i],
-                                                        0);
-                            regArgNum--;
-                            regArgMaskLive &= ~genRegMask((regNumber)regArg[j]);
-                            regArg[j] = 0;
-                        }
-                        else if (k == i)
-                        {
-                            GetEmitter()->emitIns_R_R_I(ins, EA_PTRSIZE, rsGetRsvdReg(), (regNumber)regArg[i], 0);
-                            GetEmitter()->emitIns_R_R_I(ins2, EA_PTRSIZE, (regNumber)regArgInit[j],
-                                                        (regNumber)regArg[j], 0);
-                            GetEmitter()->emitIns_R_R_I(INS_ori, EA_PTRSIZE, (regNumber)regArgInit[i], rsGetRsvdReg(),
-                                                        0);
-                            regArgNum--;
-                            regArgMaskLive &= ~genRegMask((regNumber)regArg[j]);
-                            regArg[j] = 0;
-                        }
-                        else
-                        {
-                            NYI_RISCV64("-----------CodeGen::genFnPrologCalleeRegArgs() error!--");
-                        }
 
-                        if (regArgNum == 0)
-                        {
-                            break;
-                        }
+                    tmpRegs[count] = (unsigned) cur;
+
+                    for (int count2 = 1; count2 < count; count2++) // Backlink could be only to first index
+                    {
+                        assert(cur != tmpRegs[count2] && "-----------CodeGen::genFnPrologCalleeRegArgs() error: intRegs!");
                     }
+                    assert(cur < MAX_REG_ARG);
                 }
+
+                if (loop)
+                {
+                    unsigned tmpArg = tmpRegs[count - 1];
+
+                    instruction ins = (regArgMaskIsInt & (1 << regArg[tmpArg])) != 0 ? INS_slliw : INS_ori;
+                    GetEmitter()->emitIns_R_R_I(INS_ori, EA_PTRSIZE, rsGetRsvdReg(), (regNumber)regArg[tmpArg], 0);
+                    count--;    // Decrease count to not access last node which points to start node i
+                    assert(count > 0);
+                }
+
+                for (int cur = count - 1; cur >= 0; cur--)
+                {
+                    unsigned tmpArg = tmpRegs[cur];
+
+                    instruction ins = (regArgMaskIsInt & (1 << regArg[tmpArg])) != 0 ? INS_slliw : INS_ori;
+                    GetEmitter()->emitIns_R_R_I(ins, EA_PTRSIZE, (regNumber)regArgInit[tmpArg],
+                                                (regNumber)regArg[tmpArg], 0);
+
+                    regArgMaskLive &= ~genRegMask((regNumber)regArg[tmpArg]);
+                    regArg[tmpArg] = 0;
+                    regArgNum--;
+                    assert(regArgNum >= 0);
+                };
+
+                if (loop)
+                {
+                    unsigned tmpArg = tmpRegs[count]; // count was decreased for loop case
+
+                    instruction ins = (regArgMaskIsInt & (1 << regArg[tmpArg])) != 0 ? INS_slliw : INS_ori;
+                    GetEmitter()->emitIns_R_R_I(ins, EA_PTRSIZE, (regNumber)regArg[i], rsGetRsvdReg(), 0);
+
+                    regArgMaskLive &= ~genRegMask((regNumber)regArg[tmpArg]);
+                    regArg[tmpArg] = 0;
+                    regArgNum--;
+                }
+                assert(regArgNum >= 0);
             }
         }
 
