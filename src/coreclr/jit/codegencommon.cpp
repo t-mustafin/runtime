@@ -2833,7 +2833,7 @@ XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 #pragma warning(disable : 21000) // Suppress PREFast warning about overly large function
 #endif
 
-#if !defined(TARGET_LOONGARCH64) && !defined(TARGET_RISCV64)
+#if !defined(TARGET_LOONGARCH64)
 void CodeGen::genFnPrologCalleeRegArgs(regNumber xtraReg, bool* pXtraRegClobbered, RegState* regState)
 {
 #ifdef DEBUG
@@ -3252,10 +3252,13 @@ void CodeGen::genFnPrologCalleeRegArgs(regNumber xtraReg, bool* pXtraRegClobbere
                 }
 
 #if !defined(TARGET_64BIT)
+//#if FEATURE_MULTIREG_ARGS
                 if ((i == 1) && varTypeIsStruct(varDsc) && (varDsc->GetOtherReg() == regNum))
                 {
                     goto NON_DEP;
                 }
+//#endif // FEATURE_MULTIREG_ARGS
+
                 if ((i == 1) && (genActualType(varDsc->TypeGet()) == TYP_LONG) && (varDsc->GetOtherReg() == regNum))
                 {
                     goto NON_DEP;
@@ -6116,7 +6119,7 @@ void CodeGen::genFnProlog()
     {
         compiler->lvaUpdateArgsWithInitialReg();
 
-#if defined(TARGET_LOONGARCH64) || defined(TARGET_RISCV64)
+#if defined(TARGET_LOONGARCH64)
         if (intRegState.rsCalleeRegArgMaskLiveIn || floatRegState.rsCalleeRegArgMaskLiveIn)
         {
             initRegZeroed = false;
@@ -6152,7 +6155,7 @@ void CodeGen::genFnProlog()
             }
         };
 
-#if defined(TARGET_AMD64) || defined(TARGET_ARM64) || defined(TARGET_ARM)
+#if defined(TARGET_AMD64) || defined(TARGET_ARM64) || defined(TARGET_ARM) || defined(TARGET_RISCV64)
         assignIncomingRegisterArgs(&intRegState);
         assignIncomingRegisterArgs(&floatRegState);
 #else

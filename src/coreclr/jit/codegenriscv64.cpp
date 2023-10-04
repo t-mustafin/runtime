@@ -7642,6 +7642,7 @@ void CodeGen::genPopCalleeSavedRegisters(bool jmpEpilog)
     }
 }
 
+#if 0
 void CodeGen::genFnPrologCalleeRegArgs()
 {
     assert(!(intRegState.rsCalleeRegArgMaskLiveIn & floatRegState.rsCalleeRegArgMaskLiveIn));
@@ -8081,6 +8082,7 @@ void CodeGen::genFnPrologCalleeRegArgs()
     assert(regArgNum == 0);
     assert(!regArgMaskLive);
 }
+#endif
 
 #ifdef PROFILING_SUPPORTED
 //-----------------------------------------------------------------------------------

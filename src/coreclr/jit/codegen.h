@@ -251,7 +251,7 @@ protected:
     //
 
     void genEstablishFramePointer(int delta, bool reportUnwindData);
-#if defined(TARGET_LOONGARCH64) || defined(TARGET_RISCV64)
+#if defined(TARGET_LOONGARCH64)
     void genFnPrologCalleeRegArgs();
 #else
     void genFnPrologCalleeRegArgs(regNumber xtraReg, bool* pXtraRegClobbered, RegState* regState);
