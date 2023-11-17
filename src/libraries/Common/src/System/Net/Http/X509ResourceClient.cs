@@ -43,6 +43,7 @@ namespace System.Net.Http
             {
                 ReportNoClient();
 
+                System.Console.WriteLine("DownloadAssetCore returns null cause s_downloadBytes is null");
                 return null;
             }
 
@@ -50,6 +51,7 @@ namespace System.Net.Http
             {
                 ReportNegativeTimeout();
 
+                System.Console.WriteLine("DownloadAssetCore returns null cause downloadTimeout <= TimeSpan.Zero");
                 return null;
             }
 
@@ -66,15 +68,20 @@ namespace System.Net.Http
                 await ((Task)task).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
                 if (task.IsCompletedSuccessfully)
                 {
+                    System.Console.WriteLine("DownloadAssetCore returns {0} cause task.IsCompletedSuccessfully", task.Result);
                     return task.Result;
                 }
             }
-            catch { }
+            catch (Exception e)
+            {
+                System.Console.WriteLine("DownloadAssetCore catch exception = {0}", e);
+            }
             finally
             {
                 cts?.Dispose();
 
                 ReportDownloadStop(ret?.Length ?? 0);
+                System.Console.WriteLine("DownloadAssetCore returns null cause end. ret.Length = {0}", ret?.Length ?? 0);
             }
 
             return null;
@@ -82,6 +89,7 @@ namespace System.Net.Http
 
         private static Func<string, CancellationToken, bool, Task<byte[]?>>? CreateDownloadBytesFunc()
         {
+            System.Console.WriteLine("CreateDownloadBytesFunc() starts");
             try
             {
                 // Use reflection to access System.Net.Http:
@@ -101,6 +109,7 @@ namespace System.Net.Http
                 if (socketsHttpHandlerType == null || httpMessageHandlerType == null || httpClientType == null || httpRequestMessageType == null ||
                     httpResponseMessageType == null || httpResponseHeadersType == null || httpContentType == null || taskOfHttpResponseMessageType == null)
                 {
+                    System.Console.WriteLine("CreateDownloadBytesFunc(): Unable to load required type.");
                     Debug.Fail("Unable to load required type.");
                     return null;
                 }
@@ -130,6 +139,7 @@ namespace System.Net.Http
                     responseHeadersProp == null || responseHeadersLocationProp == null ||
                     readAsStreamMethod == null || taskOfHttpResponseMessageResultProp == null)
                 {
+                    System.Console.WriteLine("CreateDownloadBytesFunc(): Unable to load required members.");
                     Debug.Fail("Unable to load required members.");
                     return null;
                 }
@@ -151,66 +161,27 @@ namespace System.Net.Http
                 object? httpClient = httpClientCtor.Invoke(new object?[] { socketsHttpHandler });
                 maxResponseContentBufferSizeProp.SetValue(httpClient, AiaDownloadLimit);
 
+                System.Console.WriteLine("CreateDownloadBytesFunc(): returns via async()");
                 return async (string uriString, CancellationToken cancellationToken, bool async) =>
                 {
-                    Uri uri = new Uri(uriString);
-
-                    if (!IsAllowedScheme(uri.Scheme))
+                    try
                     {
-                        return null;
-                    }
+                        System.Console.WriteLine("CreateDownloadBytesFunc()async starts. async = " + async);
+                        Uri uri = new Uri(uriString);
 
-                    // Equivalent of:
-                    // HttpRequestMessage requestMessage = new HttpRequestMessage() { RequestUri = new Uri(uri) };
-                    // HttpResponseMessage responseMessage = httpClient.Send(requestMessage, cancellationToken);
-                    // Note: using a ConstructorInfo instead of Activator.CreateInstance, so the ILLinker can see the usage through the lambda method.
-                    object requestMessage = httpRequestMessageCtor.Invoke(null);
-                    requestUriProp.SetValue(requestMessage, uri);
-                    object responseMessage;
-
-                    if (async)
-                    {
-                        Task sendTask = (Task)sendAsyncMethod.Invoke(httpClient, new object[] { requestMessage, cancellationToken })!;
-                        await sendTask.ConfigureAwait(false);
-                        responseMessage = taskOfHttpResponseMessageResultProp.GetValue(sendTask)!;
-                    }
-                    else
-                    {
-                        responseMessage = sendMethod.Invoke(httpClient, new object[] { requestMessage, cancellationToken })!;
-                    }
-
-                    int redirections = 0;
-                    Uri? redirectUri;
-                    bool hasRedirect;
-                    while (true)
-                    {
-                        int statusCode = (int)responseStatusCodeProp.GetValue(responseMessage)!;
-                        object responseHeaders = responseHeadersProp.GetValue(responseMessage)!;
-                        Uri? location = (Uri?)responseHeadersLocationProp.GetValue(responseHeaders);
-                        redirectUri = GetUriForRedirect((Uri)requestUriProp.GetValue(requestMessage)!, statusCode, location, out hasRedirect);
-                        if (redirectUri == null)
+                        if (!IsAllowedScheme(uri.Scheme))
                         {
-                            break;
-                        }
-
-                        ((IDisposable)responseMessage).Dispose();
-
-                        redirections++;
-                        if (redirections > MaxRedirections)
-                        {
-                            ReportRedirectsExceeded();
-
+                            System.Console.WriteLine("CreateDownloadBytesFunc()async: return null cause !IsAllowedScheme(uri.Scheme)");
                             return null;
                         }
 
-                        ReportRedirected(redirectUri);
-
                         // Equivalent of:
-                        // requestMessage = new HttpRequestMessage() { RequestUri = redirectUri };
-                        // requestMessage.RequestUri = redirectUri;
-                        // responseMessage = httpClient.Send(requestMessage, cancellationToken);
-                        requestMessage = httpRequestMessageCtor.Invoke(null);
-                        requestUriProp.SetValue(requestMessage, redirectUri);
+                        // HttpRequestMessage requestMessage = new HttpRequestMessage() { RequestUri = new Uri(uri) };
+                        // HttpResponseMessage responseMessage = httpClient.Send(requestMessage, cancellationToken);
+                        // Note: using a ConstructorInfo instead of Activator.CreateInstance, so the ILLinker can see the usage through the lambda method.
+                        object requestMessage = httpRequestMessageCtor.Invoke(null);
+                        requestUriProp.SetValue(requestMessage, uri);
+                        object responseMessage;
 
                         if (async)
                         {
@@ -222,34 +193,87 @@ namespace System.Net.Http
                         {
                             responseMessage = sendMethod.Invoke(httpClient, new object[] { requestMessage, cancellationToken })!;
                         }
-                    }
 
-                    if (hasRedirect && redirectUri == null)
+                        int redirections = 0;
+                        Uri? redirectUri;
+                        bool hasRedirect;
+                        while (true)
+                        {
+                            int statusCode = (int)responseStatusCodeProp.GetValue(responseMessage)!;
+                            object responseHeaders = responseHeadersProp.GetValue(responseMessage)!;
+                            Uri? location = (Uri?)responseHeadersLocationProp.GetValue(responseHeaders);
+                            redirectUri = GetUriForRedirect((Uri)requestUriProp.GetValue(requestMessage)!, statusCode, location, out hasRedirect);
+                            if (redirectUri == null)
+                            {
+                                break;
+                            }
+
+                            ((IDisposable)responseMessage).Dispose();
+
+                            redirections++;
+                            if (redirections > MaxRedirections)
+                            {
+                                ReportRedirectsExceeded();
+                                System.Console.WriteLine("CreateDownloadBytesFunc()async: return null cause redirections > MaxRedirections");
+
+                                return null;
+                            }
+
+                            ReportRedirected(redirectUri);
+
+                            // Equivalent of:
+                            // requestMessage = new HttpRequestMessage() { RequestUri = redirectUri };
+                            // requestMessage.RequestUri = redirectUri;
+                            // responseMessage = httpClient.Send(requestMessage, cancellationToken);
+                            requestMessage = httpRequestMessageCtor.Invoke(null);
+                            requestUriProp.SetValue(requestMessage, redirectUri);
+
+                            if (async)
+                            {
+                                Task sendTask = (Task)sendAsyncMethod.Invoke(httpClient, new object[] { requestMessage, cancellationToken })!;
+                                await sendTask.ConfigureAwait(false);
+                                responseMessage = taskOfHttpResponseMessageResultProp.GetValue(sendTask)!;
+                            }
+                            else
+                            {
+                                responseMessage = sendMethod.Invoke(httpClient, new object[] { requestMessage, cancellationToken })!;
+                            }
+                        }
+                        if (hasRedirect && redirectUri == null)
+                        {
+                            System.Console.WriteLine("CreateDownloadBytesFunc()async: return null cause hasRedirect && redirectUri == null");
+                            return null;
+                        }
+
+                        // Equivalent of:
+                        // using Stream responseStream = resp.Content.ReadAsStream();
+                        object content = responseContentProp.GetValue(responseMessage)!;
+                        using Stream responseStream = (Stream)readAsStreamMethod.Invoke(content, null)!;
+
+                        var result = new MemoryStream();
+                        if (async)
+                        {
+                            await responseStream.CopyToAsync(result).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            responseStream.CopyTo(result);
+                        }
+                        ((IDisposable)responseMessage).Dispose();
+                        System.Console.WriteLine("CreateDownloadBytesFunc()async: returns: {0}", result.ToArray().ToString());
+                        return result.ToArray();
+                    }
+                    catch (Exception e)
                     {
+                        System.Console.WriteLine("CreateDownloadBytesFunc()async catches Exception: " + e);
+                        System.Console.WriteLine("CreateDownloadBytesFunc()async InnerException: " + e.InnerException);
                         return null;
-                    }
-
-                    // Equivalent of:
-                    // using Stream responseStream = resp.Content.ReadAsStream();
-                    object content = responseContentProp.GetValue(responseMessage)!;
-                    using Stream responseStream = (Stream)readAsStreamMethod.Invoke(content, null)!;
-
-                    var result = new MemoryStream();
-                    if (async)
-                    {
-                        await responseStream.CopyToAsync(result).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        responseStream.CopyTo(result);
-                    }
-                    ((IDisposable)responseMessage).Dispose();
-                    return result.ToArray();
+                    };
                 };
             }
-            catch
+            catch (Exception e)
             {
-                // We shouldn't have any exceptions, but if we do, ignore them all.
+                System.Console.WriteLine("CreateDownloadBytesFunc() catch exception = {0}", e);
                 return null;
             }
         }

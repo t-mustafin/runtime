@@ -282,7 +282,7 @@ internal static partial class Interop
             X509_V_ERR_UNABLE_TO_DECRYPT_CERT_SIGNATURE = 4,
             X509_V_ERR_UNABLE_TO_DECRYPT_CRL_SIGNATURE = 5,
             X509_V_ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY = 6,
-            X509_V_ERR_CERT_SIGNATURE_FAILURE = 7,
+            X509_V_ERR_CERT_SIGNATURE_FAILURE = 7,  // It is what I got for x64
             X509_V_ERR_CRL_SIGNATURE_FAILURE = 8,
             X509_V_ERR_CERT_NOT_YET_VALID = 9,
             X509_V_ERR_CERT_HAS_EXPIRED = 10,
@@ -295,7 +295,7 @@ internal static partial class Interop
             X509_V_ERR_OUT_OF_MEM = 17,
             X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT = 18,
             X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN = 19,
-            X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY = 20,
+            X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY = 20, // It is what I got for riscv64
             X509_V_ERR_UNABLE_TO_VERIFY_LEAF_SIGNATURE = 21,
             X509_V_ERR_CERT_CHAIN_TOO_LONG = 22,
             X509_V_ERR_CERT_REVOKED = 23,

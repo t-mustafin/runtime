@@ -67,6 +67,7 @@ namespace System.Security.Cryptography.X509Certificates
             _storeCtx = storeCtx;
             _verificationTime = verificationTime;
             _downloadTimeout = downloadTimeout;
+            System.Console.WriteLine("OpenSslX509ChainProcessor.ctor: _leafHandle = {5}, _store = {0} _untrustedLookup = {1} _storeCtx = {2} _verificationTime = {3} _downloadTimeout = {4}", _store.ToString(), _untrustedLookup.ToString(), _storeCtx.ToString(), _verificationTime.ToString(), _downloadTimeout.ToString(), _leafHandle.ToString());
         }
 
         public void Dispose()
@@ -205,12 +206,26 @@ namespace System.Security.Cryptography.X509Certificates
 
         internal static bool IsCompleteChain(Interop.Crypto.X509VerifyStatusCode statusCode)
         {
+            System.Diagnostics.StackTrace st = new System.Diagnostics.StackTrace(true);
+            System.Console.WriteLine();
+            for(int i = 0; i < st.FrameCount; i++)
+            {
+                // Note that high up the call stack, there is only
+                // one stack frame.
+                System.Diagnostics.StackFrame? sf = st.GetFrame(i);
+                if (sf == null)
+                    continue;
+                System.Console.WriteLine("{0}", sf.ToString());
+            }
+
             switch (statusCode.UniversalCode)
             {
                 case X509VerifyStatusCodeUniversal.X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT:
                 case X509VerifyStatusCodeUniversal.X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY:
+                    System.Console.WriteLine("IsCompleteChain returns false");
                     return false;
                 default:
+                    System.Console.WriteLine("IsCompleteChain returns true");
                     return true;
             }
         }
@@ -226,6 +241,8 @@ namespace System.Security.Cryptography.X509Certificates
 
             while (!IsCompleteChain(statusCode))
             {
+                System.Console.WriteLine("FindChainViaAia loop: statusCode = {0}", statusCode);
+
                 using (SafeX509Handle currentCert = Interop.Crypto.X509StoreCtxGetCurrentCert(storeCtx))
                 {
                     IntPtr currentHandle = currentCert.DangerousGetHandle();
@@ -233,6 +250,7 @@ namespace System.Security.Cryptography.X509Certificates
                     // No progress was made, give up.
                     if (currentHandle == lastCert)
                     {
+                        System.Console.WriteLine("FindChainViaAia breaks in currentHandle == lastCert");
                         break;
                     }
 
@@ -250,6 +268,7 @@ namespace System.Security.Cryptography.X509Certificates
                             OpenSslX509ChainEventSource.Log.NoAiaFound(currentCert);
                         }
 
+                        System.Console.WriteLine("FindChainViaAia breaks in authorityInformationAccess.Count == 0");
                         break;
                     }
 
@@ -262,6 +281,7 @@ namespace System.Security.Cryptography.X509Certificates
 
                     if (downloaded == null)
                     {
+                        System.Console.WriteLine("downloaded == null");
                         break;
                     }
 
@@ -691,6 +711,7 @@ namespace System.Security.Cryptography.X509Certificates
             // Because our callback tells OpenSSL that every problem is ignorable, it should tell us that the
             // chain is just fine (unless it returned a negative code for an exception)
             Debug.Assert(verify, "verify should have returned true");
+            System.Console.WriteLine("BuildWorkingChain(): verify = {0}", verify);
 
             extraDispose?.Dispose();
 
@@ -855,19 +876,28 @@ namespace System.Security.Cryptography.X509Certificates
                 int chainSize = Interop.Crypto.GetX509StackFieldCount(chainStack);
                 elements = new X509ChainElement[chainSize];
 
+                System.Console.WriteLine("BuildChainElements starts for loop");
                 for (int i = 0; i < chainSize; i++)
                 {
                     X509ChainStatus[] status = Array.Empty<X509ChainStatus>();
                     ErrorCollection? elementErrors =
                         workingChain?.LastError >= i ? (ErrorCollection?)workingChain[i] : null;
 
+                    System.Console.WriteLine("BuildChainElements before if: elementErrors = {0}", elementErrors.ToString());
                     if (elementErrors.HasValue && elementErrors.Value.HasErrors)
                     {
                         statusBuilder ??= new List<X509ChainStatus>();
                         overallStatus ??= new List<X509ChainStatus>();
 
                         bool hadSignatureNotValid = overallHasNotSignatureValid;
+
+                        System.Console.WriteLine("BuildChainElements elementErrors = {0}", elementErrors.ToString());
                         AddElementStatus(elementErrors.Value, statusBuilder, overallStatus, ref overallHasNotSignatureValid);
+                        System.Console.WriteLine("BuildChainElements for element i = {0} overallHasNotSignatureValid = {1}", i, overallHasNotSignatureValid);
+                        foreach (X509ChainStatus statuss in statusBuilder)
+                        {
+                            System.Console.WriteLine("BuildChainElements for element i = {0} status = {1} overallHasNotSignatureValid = {2}", i, statuss.Status, overallHasNotSignatureValid);
+                        }
 
                         // Clear NotSignatureValid for the last element when overall chain is not PartialChain or UntrustedRoot.
                         bool isLastElement = i == chainSize - 1;
@@ -876,6 +906,7 @@ namespace System.Security.Cryptography.X509Certificates
                             if (!ContainsStatus(overallStatus, X509ChainStatusFlags.PartialChain) &&
                                 !ContainsStatus(overallStatus, X509ChainStatusFlags.UntrustedRoot))
                             {
+                                System.Console.WriteLine("BuildChainElements calls RemoveStatus");
                                 RemoveStatus(statusBuilder, X509ChainStatusFlags.NotSignatureValid);
                                 RemoveStatus(overallStatus, X509ChainStatusFlags.NotSignatureValid);
                             }
@@ -888,13 +919,19 @@ namespace System.Security.Cryptography.X509Certificates
 
                     if (elementCertPtr == IntPtr.Zero)
                     {
+                        System.Console.WriteLine("BuildChainElements throw exception");
                         throw Interop.Crypto.CreateOpenSslCryptographicException();
                     }
 
                     // Duplicate the certificate handle
                     X509Certificate2 elementCert = new X509Certificate2(elementCertPtr);
+                    foreach (X509ChainStatus statuss in status)
+                    {
+                        System.Console.WriteLine("BuildChainElements for element i = {0} status = {1}", i, statuss.Status);
+                    }
                     elements[i] = new X509ChainElement(elementCert, status, "");
                 }
+                System.Console.WriteLine("BuildChainElements ends for loop");
             }
 
             return elements;
@@ -1206,6 +1243,7 @@ namespace System.Security.Cryptography.X509Certificates
 
             if (uri == null)
             {
+                System.Console.WriteLine("DownloadCertificate returns null cause FindHttpAiaRecord returns null");
                 return null;
             }
 
@@ -1542,7 +1580,7 @@ namespace System.Security.Cryptography.X509Certificates
 
                 foreach (Interop.Crypto.X509VerifyStatusCode code in this)
                 {
-                    builder.Append(delim).Append(code);
+                    builder.Append(delim).Append(code.Code);
                     delim = " | ";
                 }
 

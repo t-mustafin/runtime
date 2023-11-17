@@ -123,6 +123,7 @@ namespace System.Security.Cryptography.X509Certificates
                 Reset();
 
                 X509ChainPolicy chainPolicy = ChainPolicy;
+                System.Console.WriteLine("Build: before BuildCHain chainPolicy = {0}", chainPolicy.ToString());
                 _pal = ChainPal.BuildChain(
                     _useMachineContext,
                     certificate.Pal,
@@ -137,13 +138,16 @@ namespace System.Security.Cryptography.X509Certificates
                     chainPolicy.UrlRetrievalTimeout,
                     chainPolicy.DisableCertificateDownloads);
 
-                if (_pal == null)
+                if (_pal == null) {
+                    System.Console.WriteLine("X509Chain.Build returns false cause _pal == null");
                     return false;
+                }
 
                 _chainElements = new X509ChainElementCollection(_pal.ChainElements!);
 
                 Exception? verificationException;
                 bool? verified = _pal.Verify(chainPolicy.VerificationFlags, out verificationException);
+                System.Console.WriteLine("X509Chain.Build verified = {0}", verified);
                 if (!verified.HasValue)
                 {
                     if (throwOnException)
@@ -155,6 +159,7 @@ namespace System.Security.Cryptography.X509Certificates
                         verified = false;
                     }
                 }
+                System.Console.WriteLine("X509Chain.Build on return verified = {0}", verified);
 
                 return verified.Value;
             }

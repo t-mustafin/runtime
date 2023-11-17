@@ -21,6 +21,10 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+using System;
+using System.ComponentModel;
+
+
 namespace System.Net.Http
 {
     /// <summary>Provides a pool of connections to the same endpoint.</summary>
@@ -2613,6 +2617,8 @@ namespace System.Net.Http
 
             public ValueTask<T> WaitForConnectionAsync(HttpRequestMessage request, HttpConnectionPool pool, bool async, CancellationToken requestCancellationToken)
             {
+                Console.WriteLine("WaitForConnectionAsync({0}, {1}, {2}, {3})", request.ToString(), pool.ToString(), async.ToString(), requestCancellationToken.ToString());
+
                 return HttpTelemetry.Log.IsEnabled() || pool.Settings._metrics!.RequestsQueueDuration.Enabled
                     ? WaitForConnectionWithTelemetryAsync(request, pool, async, requestCancellationToken)
                     : WaitWithCancellationAsync(async, requestCancellationToken);
@@ -2620,6 +2626,7 @@ namespace System.Net.Http
 
             private async ValueTask<T> WaitForConnectionWithTelemetryAsync(HttpRequestMessage request, HttpConnectionPool pool, bool async, CancellationToken requestCancellationToken)
             {
+                Console.WriteLine("WaitForConnectionWithTelemetryAsync({0}, {1}, {2}, {3})", request.ToString(), pool.ToString(), async.ToString(), requestCancellationToken.ToString());
                 Debug.Assert(typeof(T) == typeof(HttpConnection) || typeof(T) == typeof(Http2Connection));
 
                 long startingTimestamp = Stopwatch.GetTimestamp();

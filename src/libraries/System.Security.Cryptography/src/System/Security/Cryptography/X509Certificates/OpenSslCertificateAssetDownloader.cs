@@ -19,6 +19,7 @@ namespace System.Security.Cryptography.X509Certificates
 
             if (data == null || data.Length == 0)
             {
+                System.Console.WriteLine("OpenSslCertificateAssetDownloader.DownloadCertificate returns null cause data == null || data.Length == 0");
                 return null;
             }
 
@@ -31,6 +32,7 @@ namespace System.Security.Cryptography.X509Certificates
                     case X509ContentType.Pkcs7:
                         break;
                     default:
+                        System.Console.WriteLine("OpenSslCertificateAssetDownloader.DownloadCertificate returns null cause contentType is default");
                         return null;
                 }
 
@@ -45,6 +47,7 @@ namespace System.Security.Cryptography.X509Certificates
                     OpenSslX509ChainEventSource.Log.InvalidDownloadedCertificate();
                 }
 
+                System.Console.WriteLine("OpenSslCertificateAssetDownloader.DownloadCertificate returns null cause CryptographicException");
                 return null;
             }
         }

@@ -59,7 +59,7 @@ namespace System.Net
         private bool _contextBound;
         private readonly bool _secure;
         private readonly X509Certificate _cert;
-        private int _timeout = 90000; // 90k ms for first request, 15k ms from then on
+        private int _timeout = 900000; // 90k ms for first request, 15k ms from then on
         private readonly Timer _timer;
         private IPEndPoint? _localEndPoint;
         private HttpListener? _lastListener;

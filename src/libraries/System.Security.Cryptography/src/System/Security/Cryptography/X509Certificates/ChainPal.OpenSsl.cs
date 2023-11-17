@@ -122,6 +122,7 @@ namespace System.Security.Cryptography.X509Certificates
                 downloadTimeout);
 
             Interop.Crypto.X509VerifyStatusCode status = chainPal.FindFirstChain(extraStore);
+            System.Console.WriteLine("BuildChainCore: status.Code = {0}", status.Code);
 
             if (OpenSslX509ChainEventSource.Log.IsEnabled())
             {

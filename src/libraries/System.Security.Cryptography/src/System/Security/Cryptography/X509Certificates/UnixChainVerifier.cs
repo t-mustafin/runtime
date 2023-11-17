@@ -17,8 +17,10 @@ namespace System.Security.Cryptography.X509Certificates
             {
                 if (HasUnsuppressedError(flags, element, isEndEntity))
                 {
+                    System.Console.WriteLine("Verify loop return false: element = {0} isEndEntity = {1}", element, isEndEntity);
                     return false;
                 }
+                System.Console.WriteLine("Verify loop: element = {0} isEndEntity = {1}", element, isEndEntity);
 
                 isEndEntity = false;
             }
@@ -32,7 +34,12 @@ namespace System.Security.Cryptography.X509Certificates
             {
                 if (status.Status == X509ChainStatusFlags.NoError)
                 {
+                    System.Console.WriteLine("HasUnsuppressedError returns false: status = {0}", status.Status);
                     return false;
+                }
+                else
+                {
+                    System.Console.WriteLine("HasUnsuppressedError false: status = {0}", status.Status);
                 }
 
                 Debug.Assert(
@@ -76,10 +83,12 @@ namespace System.Security.Cryptography.X509Certificates
                 if (!suppressionFlag.HasValue ||
                     (flags & suppressionFlag) == 0)
                 {
+                    System.Console.WriteLine("HasUnsuppressedError returns true: status = {0}", status.Status);
                     return true;
                 }
             }
 
+            System.Console.WriteLine("HasUnsuppressedError returns false");
             return false;
         }
 
