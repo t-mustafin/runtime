@@ -1022,6 +1022,9 @@ namespace ILCompiler
 
         public override void Dispose()
         {
+            // Workaround for #23103
+            _nodeFactory.ManifestMetadataTable.Dispose();
+            // Workaround for #12255
             Array.Clear(_corInfoImpls);
         }
 
