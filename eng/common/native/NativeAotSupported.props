@@ -13,6 +13,7 @@
     <!-- Reject unsupported architectures via RID suffix match -->
     <_NativeAotSupportedArch Condition="
       '$(TargetArchitecture)' != 'wasm' and
+      '$(TargetArchitecture)' != 'armel' and
       ('$(TargetArchitecture)' != 'x86' or '$(TargetOS)' == 'windows')
     ">true</_NativeAotSupportedArch>
 
