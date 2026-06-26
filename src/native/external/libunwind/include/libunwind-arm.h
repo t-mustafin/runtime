@@ -49,7 +49,7 @@ extern "C" {
    want to err on making it rather too big than too small.  */
 
 /* FIXME for ARM. Too big?  What do other things use for similar tasks?  */
-#define UNW_TDEP_CURSOR_LEN     4096
+#define UNW_TDEP_CURSOR_LEN     250
 
 typedef uint32_t unw_word_t;
 typedef int32_t unw_sword_t;
